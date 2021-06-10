@@ -118,10 +118,10 @@ subroutine setupwspd10m(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_d
   real(r_kind),parameter:: r6=6.0_r_kind
   real(r_kind),parameter:: r20=20.0_r_kind
   real(r_kind),parameter:: r360=360.0_r_kind
-  real(r_kind),parameter:: r0_1_bmiss=0.1_r_kind*bmiss
   character(len=*),parameter:: myname='setupwspd10m'
 
 ! Declare local variables
+  real(r_kind) :: r0_1_bmiss
   
   integer(i_kind) num_bad_ikx
 
@@ -190,6 +190,8 @@ subroutine setupwspd10m(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_d
 
   type(obsLList),pointer,dimension(:):: wspd10mhead
   wspd10mhead => obsLL(:)
+
+  r0_1_bmiss=0.1_r_kind*bmiss
 
   save_jacobian = conv_diagsave .and. jiter==jiterstart .and. lobsdiag_forenkf
 

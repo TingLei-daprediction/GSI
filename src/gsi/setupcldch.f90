@@ -105,7 +105,7 @@ subroutine setupcldch(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_dia
   external:: stop2
 
 ! Declare local parameters
-  real(r_kind),parameter:: r0_1_bmiss=one_tenth*bmiss
+  real(r_kind):: r0_1_bmiss
   character(len=*),parameter:: myname='setupcldch'
 
 ! Declare local variables
@@ -161,6 +161,7 @@ subroutine setupcldch(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_dia
   type(obsLList),pointer,dimension(:):: cldchhead
   cldchhead => obsLL(:)
 
+  r0_1_bmiss=one_tenth*bmiss
 ! Check to see if required guess fields are available
   call check_vars_(proceed)
   if(.not.proceed) then

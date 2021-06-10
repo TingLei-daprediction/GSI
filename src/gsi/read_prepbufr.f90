@@ -251,14 +251,14 @@ subroutine read_prepbufr(nread,ndata,nodata,infile,obstype,lunout,twindin,sis,&
   real(r_kind),parameter:: r1200= 1200.0_r_kind
   real(r_kind),parameter:: convert= 1.0e-6_r_kind
   real(r_kind),parameter:: emerr= 0.2_r_kind
-  real(r_kind),parameter:: r0_1_bmiss=one_tenth*bmiss
-  real(r_kind),parameter:: r0_01_bmiss=r0_01*bmiss
   character(80),parameter:: cspval= '88888888'
 
 !  integer(i_kind),parameter:: mxtb=5000000
 !  integer(i_kind),parameter:: nmsgmax=100000 ! max message count
 
 ! Declare local variables
+  real(r_kind) :: r0_01_bmiss
+  real(r_kind)::  r0_1_bmiss
   logical tob,qob,uvob,spdob,sstob,pwob,psob,gustob,visob,tdob,mxtmob,mitmob,pmob,howvob,cldchob
   logical metarcldobs,goesctpobs,tcamtob,lcbasob
   logical outside,driftl,convobs,inflate_error
@@ -435,6 +435,9 @@ subroutine read_prepbufr(nread,ndata,nodata,infile,obstype,lunout,twindin,sis,&
 
   real(r_double),dimension(3,1500):: fcstdat
   logical print_verbose
+
+  r0_1_bmiss=one_tenth*bmiss
+  r0_01_bmiss=r0_01*bmiss
   
   print_verbose=.false.
   if(verbose) print_verbose=.true.

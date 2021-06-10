@@ -151,6 +151,9 @@ subroutine read_gmi(mype,val_gmi,ithin,rmesh,jsatid,gstime,&
   character(8)              :: subset
   real(r_kind), parameter   :: bmiss=990_r_kind   ! miss values are 999 in bufr
                                                   ! undefined value is 1.0e+11 in bufr data files.
+                                                  !Note: according to feedback
+                                                  !from Bufr developmer, there is only one bmiss like 1.0e+11 .
+                                                  ! However, the use of bmiss here as a local parameter would be kept unchanged  
 
 !  character(40),parameter   :: str_angls='SAMA SZA SMA SGA'  ! non-operational bufr
   character(40),parameter   :: str_angls='SOLAZI SOZA SMA SSGA' 

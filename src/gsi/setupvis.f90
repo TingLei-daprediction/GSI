@@ -113,10 +113,10 @@ subroutine setupvis(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_diags
   external:: stop2
 
 ! Declare local parameters
-  real(r_kind),parameter:: r0_1_bmiss=one_tenth*bmiss
   character(len=*),parameter:: myname='setupvis'
 
 ! Declare local variables
+  real(r_kind)  :: r0_1_bmiss
   
   real(r_double) rstation_id
 
@@ -167,6 +167,7 @@ subroutine setupvis(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_diags
 
   type(obsLList),pointer,dimension(:):: vishead
   vishead => obsLL(:)
+  r0_1_bmiss=one_tenth*bmiss
 
 ! Check to see if required guess fields are available
   call check_vars_(proceed)

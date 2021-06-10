@@ -28,6 +28,7 @@ module windht
 
   use kinds, only: i_kind,r_kind,r_single,r_double
   use constants, only: ten,zero,r10
+  use obsmod, only: bmiss
 
   implicit none
 
@@ -39,7 +40,7 @@ module windht
   integer(i_kind),parameter::nmax=60000
   character(len=8),parameter::misprv="XXXXXXXX"
   character(len=8),parameter::allprov="allsprvs"
-  real(r_kind),parameter:: bmiss = 1.0e9_r_kind
+!cltorg  real(r_kind),parameter:: bmiss = 1.0e9_r_kind
 
 
   character(len=16),allocatable,dimension(:)::provlist

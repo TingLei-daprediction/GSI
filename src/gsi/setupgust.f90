@@ -118,10 +118,10 @@ subroutine setupgust(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_diag
   external:: stop2
 
 ! Declare local parameters
-  real(r_kind),parameter:: r0_1_bmiss=one_tenth*bmiss
   character(len=*),parameter:: myname='setupgust'
 
 ! Declare local variables
+  real(r_kind) :: r0_1_bmiss
   
   real(r_double) rstation_id
 
@@ -177,6 +177,7 @@ subroutine setupgust(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_diag
   type(obsLList),pointer,dimension(:):: gusthead
   gusthead => obsLL(:)
 
+  r0_1_bmiss=one_tenth*bmiss
 ! Check to see if required guess fields are available
   call check_vars_(proceed)
   if(.not.proceed) then

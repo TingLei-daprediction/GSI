@@ -110,10 +110,10 @@ subroutine setupuwnd10m(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_d
   real(r_kind),parameter:: r6=6.0_r_kind
   real(r_kind),parameter:: r20=20.0_r_kind
   real(r_kind),parameter:: r360=360.0_r_kind
-  real(r_kind),parameter:: r0_1_bmiss=one_tenth*bmiss
   character(len=*),parameter:: myname='setupuwnd10m'
 
 ! Declare local variables
+  real(r_kind) :: r0_1_bmiss
   
   integer(i_kind) num_bad_ikx
 
@@ -179,6 +179,7 @@ subroutine setupuwnd10m(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_d
   type(obsLList),pointer,dimension(:):: uwnd10mhead
   uwnd10mhead => obsLL(:)
 
+  r0_1_bmiss=one_tenth*bmiss
 ! Check to see if required guess fields are available
   call check_vars_(proceed)
   if(.not.proceed) then

@@ -538,12 +538,7 @@ module obsmod
 ! Set parameters
   real(r_single), parameter:: rmiss_single = -999.0_r_single
 
-! Set bufr missing value
-#ifdef ibm_sp
-  real(r_kind), parameter:: bmiss = 1.0e11_r_kind
-#else
-  real(r_kind), parameter:: bmiss = 1.0e9_r_kind
-#endif
+  real(r_kind)  :: bmiss = 1.0e11_r_kind
 
   logical luse_obsdiag
   logical binary_diag, netcdf_diag 
@@ -718,7 +713,7 @@ contains
 !
 !$$$ end documentation block
     implicit none
-
+    real(r_kind),external:: getbmiss
     integer(i_kind) i
 
     ntilt_radarfiles=1
@@ -942,6 +937,8 @@ contains
     uv_doe_b_237 = 0.0_r_kind      
     uv_doe_a_213 = 1.0_r_kind
     uv_doe_b_213 = 0.0_r_kind
+    bmiss=getbmiss()
+     
     
     return
   end subroutine init_obsmod_dflts

@@ -58,6 +58,7 @@ subroutine adjust_convcldobs(cld2seq,cld2seqlevs,input_cldseq,cldseqlevs,wthstr,
 !$$$
   use kinds, only: r_kind,i_kind
   use constants, only: tiny_r_kind,zero,one,two,three,four
+  use obsmod, only: bmiss
   implicit none
 
 ! input variables
@@ -75,7 +76,7 @@ subroutine adjust_convcldobs(cld2seq,cld2seqlevs,input_cldseq,cldseqlevs,wthstr,
   real(r_kind),intent (inout) :: ceiling
 
 ! declare local variables
-  real(r_kind),parameter :: bmiss= 10.e10_r_kind
+!cltorg  real(r_kind),parameter :: bmiss= 10.e10_r_kind
   real(r_kind),parameter :: lowcld1=zero 
   real(r_kind),parameter :: lowcld2=1500.0_r_kind
   real(r_kind),parameter :: midcld1=1500.0_r_kind
@@ -384,6 +385,7 @@ subroutine adjust_goescldobs(goescld,timeobs,dlat_earth,dlon_earth, &
   use kinds, only: r_kind,i_kind
   use obsmod, only: iadate
   use constants, only: zero,one,deg2rad,rad2deg,pi
+  use obsmod, only: bmiss
   implicit none
 
 ! input variables
@@ -398,7 +400,6 @@ subroutine adjust_goescldobs(goescld,timeobs,dlat_earth,dlon_earth, &
 ! declare local variables
   integer(i_kind),parameter,dimension(12):: mday=(/0,31,59,90,&
        120,151,181,212,243,273,304,334/)
-  real(r_kind),parameter :: bmiss= 10.e10_r_kind
   real(r_kind),parameter :: lowcld1=zero 
   real(r_kind),parameter :: lowcld2=1500.0_r_kind
   real(r_kind),parameter :: midcld1=1500.0_r_kind

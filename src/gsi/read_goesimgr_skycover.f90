@@ -77,14 +77,14 @@ subroutine  read_goesimgr_skycover(nread,ndata,nodata,infile,obstype,lunout,gsti
 ! Declare local parameters
   real(r_kind),parameter:: r90  = 90.0_r_kind
   real(r_kind),parameter:: r0_01 = 0.01_r_kind
-  real(r_kind),parameter:: r0_1_bmiss=one_tenth*bmiss
-  real(r_kind),parameter:: r0_01_bmiss=r0_01*bmiss
   real(r_kind),parameter:: r1200= 1200.0_r_kind
   real(r_kind),parameter:: r6= 6.0_r_kind
   real(r_kind),parameter:: r360 = 360.0_r_kind
   character(8),parameter:: cspval= '88888888'
 
 ! Declare local variables
+  real(r_kind) :: r0_1_bmiss
+  real(r_kind) :: r0_01_bmiss
   character(len=80) :: hdrstr,goescldstr,goescldstr_new
   character(len=8) ::  subset
   character(len=22) :: myname
@@ -118,6 +118,9 @@ subroutine  read_goesimgr_skycover(nread,ndata,nodata,infile,obstype,lunout,gsti
 
 !  equivalence to handle character names
   equivalence(rstation_id,c_station_id)
+
+  r0_1_bmiss=one_tenth*bmiss
+  r0_01_bmiss=r0_01*bmiss
 
   lunin=11_i_kind
   ithin=-9_i_kind

@@ -379,8 +379,6 @@ contains
 
       
 
-!cltthinktobe  should be contained in variable like grd_ens
-
 
     if(fv3sar_ensemble_opt == 0 ) then  
       call gsi_fv3ncdf_readuv(dynvars,g_u,g_v)
@@ -498,6 +496,7 @@ contains
     use gsi_bundlemod, only: gsi_bundlegetpointer
     use gsi_bundlemod, only: gsi_bundledestroy
     use gsi_bundlemod, only: gsi_gridcreate
+    use hybrid_ensemble_parameters, only: write_ens_sprd
     implicit none
 
     class(get_fv3_regional_ensperts_class), intent(inout) :: this
@@ -637,7 +636,7 @@ contains
        ps => dum2
     end if
   
-    call write_spread_dualres(st,vp,tv,rh,oz,cw,ps,mype)
+    if(write_ens_sprd) call write_spread_dualres(st,vp,tv,rh,oz,cw,ps,mype)
   
     return
   end subroutine ens_spread_dualres_regional_fv3_regional

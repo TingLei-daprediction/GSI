@@ -51,6 +51,7 @@ subroutine read_nsstbufr(nread,ndata,nodata,gstime,infile,obstype,lunout, &
   use gsi_nstcouplermod, only: nst_gsi,nstinfo
   use gsi_nstcouplermod, only: gsi_nstcoupler_deter
   use mpimod, only: npe
+  use obsmod, only: bmiss
   implicit none
 
 ! Declare passed variables
@@ -78,7 +79,7 @@ subroutine read_nsstbufr(nread,ndata,nodata,gstime,infile,obstype,lunout, &
   real(r_kind),parameter:: r90   = 90.0_r_kind
   real(r_kind),parameter:: r360 = 360.0_r_kind
 
-  real(r_kind),parameter:: bmiss = 1.0E11_r_kind
+  !cltorg real(r_kind),parameter:: bmiss = 1.0E11_r_kind
 
 ! Declare local variables
   logical outside

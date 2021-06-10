@@ -238,7 +238,6 @@ subroutine setupw(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_diagsav
   real(r_kind),parameter:: r50=50.0_r_kind
   real(r_kind),parameter:: r200=200.0_r_kind
   real(r_kind),parameter:: r360=360.0_r_kind
-  real(r_kind),parameter:: r0_1_bmiss=0.1_r_kind*bmiss
 
   character(len=*),parameter:: myname='setupw'
 
@@ -249,6 +248,7 @@ subroutine setupw(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_diagsav
   external:: stop2
 
 ! Declare local variables
+  real(r_kind) :: r0_1_bmiss
 
   real(r_double) rstation_id
   real(r_kind) qcu,qcv,trop5,tfact,fact
@@ -334,6 +334,7 @@ subroutine setupw(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,conv_diagsav
 
   type(obsLList),pointer,dimension(:):: whead
   whead => obsLL(:)
+  r0_1_bmiss=0.1_r_kind*bmiss
 
   save_jacobian = conv_diagsave .and. jiter==jiterstart .and. lobsdiag_forenkf
 

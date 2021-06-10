@@ -59,8 +59,6 @@ subroutine read_mitm_mxtm(nread,ndata,nodata,infile,obstype,lunout,gstime,sis,no
 ! Declare local parameters
   real(r_kind),parameter:: r90  = 90.0_r_kind
   real(r_kind),parameter:: r0_01 = 0.01_r_kind
-  real(r_kind),parameter:: r0_1_bmiss=one_tenth*bmiss
-  real(r_kind),parameter:: r0_01_bmiss=r0_01*bmiss
   real(r_kind),parameter:: r1200= 1200.0_r_kind
   real(r_kind),parameter:: r6= 6.0_r_kind
   real(r_kind),parameter:: r360 = 360.0_r_kind
@@ -69,6 +67,9 @@ subroutine read_mitm_mxtm(nread,ndata,nodata,infile,obstype,lunout,gstime,sis,no
   character(8),parameter:: cspval= '88888888'
 
 ! Declare local variables
+  real(r_kind) :: r0_1_bmiss
+  real(r_kind) :: r0_01_bmiss
+
   character(len=14) :: myname
   character(len=8) :: c_station_id,c_prvstg,c_sprvstg
 
@@ -137,6 +138,9 @@ subroutine read_mitm_mxtm(nread,ndata,nodata,infile,obstype,lunout,gstime,sis,no
   data maxtmint_oberrors(197)     / 1.2_r_single /
   data maxtmint_oberrors(198)     / 1.2_r_single /
   data maxtmint_oberrors(199)     / 1.2_r_single /
+
+  r0_1_bmiss=one_tenth*bmiss
+  r0_01_bmiss=r0_01*bmiss
 
   print_verbose=.false.
   if(verbose)print_verbose=.true.
