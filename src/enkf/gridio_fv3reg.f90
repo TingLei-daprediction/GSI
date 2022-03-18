@@ -59,7 +59,7 @@ module gridio
                                 "T","W","DZ","delp"/) 
   character(len=max_varname_length), parameter :: vartracers(ntracerslist) =(/'sphum','o3mr', &
                                 'liq_wat','ice_wat','rainwat','snowwat','graupel','rain_nc'/)
-  type type_fv3lamfilebank 
+  type type_fv3lamfile 
        logical l_filecombined
        character(len=max_varname_length), dimension(2):: fv3lamfilename
        integer (i_kind), dimension(2):: fv3lam_fileid(2)
@@ -67,7 +67,7 @@ module gridio
          procedure, pass(this) :: setupfilebank => type_bound_setupfilebank
          procedure, pass(this):: get_idfn => type_bound_getidfn
   end type
-  type(type_fv3lamfilebank) :: fv3lamfilebank
+  type(type_fv3lamfile) :: fv3lamfile
    
        
 contains
@@ -173,7 +173,7 @@ contains
          fv3filename=trim(adjustl(filename))//"_dynvartracer"
          call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_nowrite,file_id),&
                     myname_,'open: '//trim(adjustl(fv3filename)) )
-         call fv3lamfilebank%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
+         call fv3lamfile%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
       else
          fv3filename=trim(adjustl(filename))//"_dynvars"
          call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_nowrite,file_id),&
@@ -181,7 +181,7 @@ contains
          fv3filename1=trim(adjustl(filename))//"_tracer"
          call nc_check( nf90_open(trim(adjustl(fv3filename1)),nf90_nowrite,file_id1),&
                     myname_,'open: '//trim(adjustl(fv3filename1)) )
-         call fv3lamfilebank%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename))  , &
+         call fv3lamfile%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename))  , &
                                        fileid2=file_id1,fv3fn2=trim(adjustl(fv3filename1)) )
          
       endif 
@@ -195,7 +195,7 @@ contains
     if (u_ind > 0) then
     allocate(uworkvar3d(nx_res,ny_res+1,nlevs))
       varstrname = 'u'
-      call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+      call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,uworkvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -217,7 +217,7 @@ contains
     if (v_ind > 0) then
     allocate(vworkvar3d(nx_res+1,ny_res,nlevs))
        varstrname = 'v'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,vworkvar3d)
     do k=1,nlevs
        nn = nn_tile0
@@ -239,7 +239,7 @@ contains
     if (w_ind > 0) then
     allocate(wworkvar3d(nx_res,ny_res,nlevs))
        varstrname = 'W'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,wworkvar3d)
     do k=1,nlevs
        nn = nn_tile0
@@ -262,10 +262,10 @@ contains
     if (tv_ind > 0.or.tsen_ind) then
        allocate(tsenworkvar3d(nx_res,ny_res,nlevs))
        varstrname = 'T'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,tsenworkvar3d)
        varstrname = 'sphum'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,qworkvar3d)
 
 
@@ -323,7 +323,7 @@ contains
     
    if (oz_ind > 0) then
        varstrname = 'o3mr'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -344,7 +344,7 @@ contains
 
    if (ql_ind > 0) then
        varstrname = 'liq_wat'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -365,7 +365,7 @@ contains
 
    if (qi_ind > 0) then
        varstrname = 'ice_wat'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -386,7 +386,7 @@ contains
 
    if (qr_ind > 0) then
        varstrname = 'rainwat'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -407,7 +407,7 @@ contains
 
    if (qs_ind > 0) then
        varstrname = 'snowwat'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -428,7 +428,7 @@ contains
 
    if (qg_ind > 0) then
        varstrname = 'graupel'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -449,7 +449,7 @@ contains
 
    if (qnr_ind > 0) then
        varstrname = 'rain_nc'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -480,14 +480,9 @@ contains
     if (ps_ind > 0) then
       allocate(workprsi(nx_res,ny_res,nlevsp1))
       allocate(pswork(nx_res,ny_res))
-!clt      fv3filename=trim(adjustl(filename))//"_dynvartracer"
-!clt      call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_nowrite,file_id),&
-!clt                      myname_,'open: '//trim(adjustl(fv3filename)) )
-      call fv3lamfilebank%get_idfn('delp',file_id,fv3filename)
+      call fv3lamfile%get_idfn('delp',file_id,fv3filename)
       call read_fv3_restart_data3d('delp',fv3filename,file_id,workvar3d)  
        !print *,'min/max delp',ntile,minval(delp),maxval(delp)
-!cltorg      call nc_check( nf90_close(file_id),&
-!clt      myname_,'close '//trim(fv3filename) )
       workprsi(:,:,nlevsp1)=eta1_ll(nlevsp1) !etal_ll is needed
       do i=nlevs,1,-1
         workprsi(:,:,i)=workvar3d(:,:,i)*0.01_r_kind+workprsi(:,:,i+1)
@@ -548,8 +543,8 @@ contains
           myname_,'close '//trim(filename) )
       else
        do ifile=1,2
-        file_id=fv3lamfilebank%fv3lam_fileid(ifile)
-        filename=fv3lamfilebank%fv3lamfilename(ifile)
+        file_id=fv3lamfile%fv3lam_fileid(ifile)
+        filename=fv3lamfile%fv3lamfilename(ifile)
         call nc_check( nf90_close(file_id),&
           myname_,'close '//trim(filename) )
        enddo
@@ -684,12 +679,11 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
       nn_tile0=(ntile-1)*nx_res*ny_res
       write(char_tile, '(i1)') ntile
       filename = "fv3sar_tile"//char_tile//"_"//trim(charnanal)
-!cltorg      fv3filename=trim(adjustl(filename))//"_dynvartracer"
       if(l_fv3reg_filecombined) then
          fv3filename=trim(adjustl(filename))//"_dynvartracer"
          call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_write,file_id),&
                     myname_,'open: '//trim(adjustl(fv3filename)) )
-         call fv3lamfilebank%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
+         call fv3lamfile%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
       else
          fv3filename=trim(adjustl(filename))//"_dynvars"
          call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_write,file_id),&
@@ -697,7 +691,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
          fv3filename1=trim(adjustl(filename))//"_tracer"
          call nc_check( nf90_open(trim(adjustl(fv3filename1)),nf90_write,file_id1),&
                     myname_,'open: '//trim(adjustl(fv3filename1)) )
-         call fv3lamfilebank%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename))  , &
+         call fv3lamfile%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename))  , &
                                        fileid2=file_id1,fv3fn2=trim(adjustl(fv3filename1)) )
          
       endif 
@@ -712,7 +706,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
        varstrname = 'u'
        allocate(uworkvar3d(nx_res,ny_res+1,nlevs))
          
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,uworkvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -734,7 +728,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
        varstrname = 'v'
        allocate(vworkvar3d(nx_res+1,ny_res,nlevs))
          
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,vworkvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -756,7 +750,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
        varstrname = 'W'
        allocate(wworkvar3d(nx_res,ny_res,nlevs))
 
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,wworkvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -787,7 +781,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
          enddo
       enddo
       enddo
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
           workvar3d=workvar3d+workinc3d
        call write_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
@@ -804,28 +798,28 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
 
        varstrname = 'T'
        allocate(tsenworkvar3d(nx_res,ny_res,nlevs))
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,tsenworkvar3d)
        varstrname = 'sphum'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,qworkvar3d)
        tvworkvar3d=tsenworkvar3d*(one+fv*qworkvar3d)
        tvworkvar3d=tvworkvar3d+workinc3d
        if(q_ind > 0) then
         do k=1,nlevs
-            nn = nn_tile0
-        do j=1,ny_res
-           do i=1,nx_res
-              nn=nn+1
-              workinc3d(i,j,k)=vargrid(nn,levels(q_ind-1)+k,nb,ne) 
+           nn = nn_tile0
+           do j=1,ny_res
+              do i=1,nx_res
+                 nn=nn+1
+                 workinc3d(i,j,k)=vargrid(nn,levels(q_ind-1)+k,nb,ne) 
+              enddo
            enddo
-        enddo
         enddo
        qworkvar3d=qworkvar3d+workinc3d   
        endif
        tsenworkvar3d=tvworkvar3d/(one+fv*qworkvar3d)
        varstrname = 'T'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call write_fv3_restart_data3d(varstrname,fv3filename,file_id,tsenworkvar3d)
        do k=1,nlevs
           if (nproc .eq. 0)                                               &
@@ -839,7 +833,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
        if(q_ind>0) then
        varstrname='sphum'
      
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call write_fv3_restart_data3d(varstrname,fv3filename,file_id,qworkvar3d)
        do k=1,nlevs
           if (nproc .eq. 0)                                               &
@@ -857,7 +851,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
     if (oz_ind > 0) then
        varstrname = 'o3mr'
          
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -875,7 +869,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
 
     if (ql_ind > 0) then
        varstrname = 'liq_wat'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -898,7 +892,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
     if (qi_ind > 0) then
        varstrname = 'ice_wat'
 
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -921,7 +915,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
     if (qr_ind > 0) then
        varstrname = 'rainwat'
 
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -944,7 +938,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
     if (qs_ind > 0) then
        varstrname = 'snowwat'
 
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -967,7 +961,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
     if (qg_ind > 0) then
        varstrname = 'graupel'
 
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -989,7 +983,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
 
     if (qnr_ind > 0) then
        varstrname = 'rain_nc'
-       call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
       do k=1,nlevs
           nn = nn_tile0
@@ -1013,7 +1007,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
       allocate(workprsi(nx_res,ny_res,nlevsp1))
       allocate(pswork(nx_res,ny_res))
       varstrname = 'delp'
-      call fv3lamfilebank%get_idfn(varstrname,file_id,fv3filename)
+      call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
       call read_fv3_restart_data3d(varstrname,filename,file_id,workvar3d)   ! Pascal
       !print *,'min/max delp',ntile,minval(delp),maxval(delp)
       workprsi(:,:,nlevsp1)=eta1_ll(nlevsp1) !etal_ll is needed
@@ -1051,17 +1045,17 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
        call write_fv3_restart_data3d(varstrname,filename,file_id,workvar3d)
     end if
  
-      if(l_fv3reg_filecombined) then
-        call nc_check( nf90_close(file_id),&
-          myname_,'close '//trim(filename) )
-      else
-       do ifile=1,2
-        file_id=fv3lamfilebank%fv3lam_fileid(ifile)
-        filename=fv3lamfilebank%fv3lamfilename(ifile)
-        call nc_check( nf90_close(file_id),&
-          myname_,'close '//trim(filename) )
-       enddo
-     endif 
+    if(l_fv3reg_filecombined) then
+      call nc_check( nf90_close(file_id),&
+        myname_,'close '//trim(filename) )
+    else
+      do ifile=1,2
+      file_id=fv3lamfile%fv3lam_fileid(ifile)
+      filename=fv3lamfile%fv3lamfilename(ifile)
+      call nc_check( nf90_close(file_id),&
+        myname_,'close '//trim(filename) )
+      enddo
+     endif
 
 
     !----------------------------------------------------------------------
@@ -1153,7 +1147,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
     logical, intent(in) :: no_inflate_flag
   end subroutine writegriddata_pnc
   subroutine type_bound_setupfilebank(this,fileid1,fv3fn1,fileid2,fv3fn2)
-       class (type_fv3lamfilebank) :: this  
+       class (type_fv3lamfile) :: this  
        integer(i_kind) fileid1
        integer(i_kind), optional :: fileid2
        character(len=*)::fv3fn1
@@ -1170,39 +1164,39 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
          this%fv3lam_fileid(1)=fileid1
        endif
    end subroutine type_bound_setupfilebank
-       subroutine type_bound_getidfn(this,vnamloc,fileid,fv3fn)
-       class (type_fv3lamfilebank) :: this  
-       integer(i_kind) fileid
-       character(len=*)::fv3fn,vnamloc
-       if (.not.this%l_filecombined) then
-         if(ifindstrloc(vardynvars,vnamloc)> 0)  then  
-           fv3fn=trim(this%fv3lamfilename(1))
-           fileid=this%fv3lam_fileid(1)
-         else if(ifindstrloc(vartracers,vnamloc)> 0)  then  
-           fv3fn=trim(this%fv3lamfilename(2))
-           fileid=this%fv3lam_fileid(2)
-         else
-           write(6,*)"the varname ",trim(vnamloc)," is not recognized in the ype_bound_getidfn, stop"
-           call stop2(23)
-         endif
-       else
-         fv3fn=trim(this%fv3lamfilename(1))
-         fileid=this%fv3lam_fileid(1)
-       endif
-       end subroutine type_bound_getidfn
-       function ifindstrloc(str_array,strin)
-         integer(i_kind) ifindstrloc
-         character(len=max_varname_length),dimension(:) :: str_array
-         character(len=*) :: strin
-         integer(i_kind) i
-         ifindstrloc=0
-         do i=1,size(str_array)
-          if(trim(str_array(i)) == trim(strin)) then
-            ifindstrloc=i
-            exit
-          endif
-         enddo
-       end function ifindstrloc
+   subroutine type_bound_getidfn(this,vnamloc,fileid,fv3fn)
+   class (type_fv3lamfile) :: this  
+   integer(i_kind) fileid
+   character(len=*)::fv3fn,vnamloc
+   if (.not.this%l_filecombined) then
+     if(ifindstrloc(vardynvars,vnamloc)> 0)  then  
+       fv3fn=trim(this%fv3lamfilename(1))
+       fileid=this%fv3lam_fileid(1)
+     else if(ifindstrloc(vartracers,vnamloc)> 0)  then  
+       fv3fn=trim(this%fv3lamfilename(2))
+       fileid=this%fv3lam_fileid(2)
+     else
+       write(6,*)"the varname ",trim(vnamloc)," is not recognized in the ype_bound_getidfn, stop"
+       call stop2(23)
+     endif
+   else
+     fv3fn=trim(this%fv3lamfilename(1))
+     fileid=this%fv3lam_fileid(1)
+   endif
+   end subroutine type_bound_getidfn
+   function ifindstrloc(str_array,strin)
+     integer(i_kind) ifindstrloc
+     character(len=max_varname_length),dimension(:) :: str_array
+     character(len=*) :: strin
+     integer(i_kind) i
+     ifindstrloc=0
+     do i=1,size(str_array)
+      if(trim(str_array(i)) == trim(strin)) then
+        ifindstrloc=i
+        exit
+      endif
+     enddo
+   end function ifindstrloc
 
 
 
