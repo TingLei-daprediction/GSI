@@ -64,7 +64,7 @@ module gridio
        character(len=max_varname_length), dimension(2):: fv3lamfilename
        integer (i_kind), dimension(2):: fv3lam_fileid(2)
        contains
-         procedure, pass(this) :: setupfilebank => type_bound_setupfilebank
+         procedure, pass(this) :: setupfile => type_bound_setupfile
          procedure, pass(this):: get_idfn => type_bound_getidfn
   end type
   type(type_fv3lamfile) :: fv3lamfile
@@ -158,401 +158,399 @@ contains
     backgroundloop: do nb=1,ntimes
 
     ! Define character string for ensemble member file
-    if (nanal > 0) then
-      write(charnanal,'(a3, i3.3)') 'mem', nanal
-    else
-      charnanal = 'ensmean'
-    endif
-
-     do ntile=1,ntiles
-      nn_tile0=(ntile-1)*nx_res*ny_res
-      write(char_tile, '(i1)') ntile
-
-      filename = "fv3sar_tile"//char_tile//"_"//trim(charnanal)
-      if(l_fv3reg_filecombined) then
-         fv3filename=trim(adjustl(filename))//"_dynvartracer"
-         call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_nowrite,file_id),&
-                    myname_,'open: '//trim(adjustl(fv3filename)) )
-         call fv3lamfile%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
+      if (nanal > 0) then
+        write(charnanal,'(a3, i3.3)') 'mem', nanal
       else
-         fv3filename=trim(adjustl(filename))//"_dynvars"
-         call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_nowrite,file_id),&
-                    myname_,'open: '//trim(adjustl(fv3filename)) )
-         fv3filename1=trim(adjustl(filename))//"_tracer"
-         call nc_check( nf90_open(trim(adjustl(fv3filename1)),nf90_nowrite,file_id1),&
-                    myname_,'open: '//trim(adjustl(fv3filename1)) )
-         call fv3lamfile%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename))  , &
-                                       fileid2=file_id1,fv3fn2=trim(adjustl(fv3filename1)) )
-         
-      endif 
-
-    !----------------------------------------------------------------------
-    ! read u-component
-
-    !----------------------------------------------------------------------
-    ! Update u and v variables (same for NMM and ARW)
-      
-    if (u_ind > 0) then
-    allocate(uworkvar3d(nx_res,ny_res+1,nlevs))
-      varstrname = 'u'
-      call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-      call read_fv3_restart_data3d(varstrname,fv3filename,file_id,uworkvar3d)
-      do k=1,nlevs
-          nn = nn_tile0
-        do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            vargrid(nn,levels(u_ind-1)+k,nb,ne)=uworkvar3d(i,j,k) 
-         enddo
-        enddo
-      enddo
-      do k = levels(u_ind-1)+1, levels(u_ind)
-          if (nproc .eq. 0)                                               &
-             write(6,*) 'READFVregional : u ',                           &
-                 & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-      enddo
-
-    deallocate(uworkvar3d)
-    endif
-    if (v_ind > 0) then
-    allocate(vworkvar3d(nx_res+1,ny_res,nlevs))
-       varstrname = 'v'
-       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,vworkvar3d)
-    do k=1,nlevs
-       nn = nn_tile0
-       do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            vargrid(nn,levels(v_ind-1)+k,nb,ne)=vworkvar3d(i,j,k) 
-         enddo
-       enddo
-    enddo
-    do k = levels(v_ind-1)+1, levels(v_ind)
-        if (nproc .eq. 0)                                               &
-             write(6,*) 'READFVregional : v ',                           &
-                 & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-    enddo
-    deallocate(vworkvar3d)
-
-    endif
-    if (w_ind > 0) then
-    allocate(wworkvar3d(nx_res,ny_res,nlevs))
-       varstrname = 'W'
-       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,wworkvar3d)
-    do k=1,nlevs
-       nn = nn_tile0
-       do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            vargrid(nn,levels(w_ind-1)+k,nb,ne)=wworkvar3d(i,j,k)
-         enddo
-       enddo
-    enddo
-    do k = levels(w_ind-1)+1, levels(w_ind)
-        if (nproc .eq. 0)                                               &
-             write(6,*) 'READFVregional : w ',                           &
-                 & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-    enddo
-    deallocate(wworkvar3d)
-
-    endif
-
-    if (tv_ind > 0.or.tsen_ind) then
-       allocate(tsenworkvar3d(nx_res,ny_res,nlevs))
-       varstrname = 'T'
-       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,tsenworkvar3d)
-       varstrname = 'sphum'
-       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,qworkvar3d)
-
-
-       if (q_ind > 0) then
-           varstrname = 'sphum'
-           do k=1,nlevs
-              nn = nn_tile0
-              do j=1,ny_res
-                 do i=1,nx_res
-                    nn=nn+1
-                    vargrid(nn,levels(q_ind-1)+k,nb,ne)=qworkvar3d(i,j,k) 
-                  enddo
-               enddo
-            enddo
-            do k = levels(q_ind-1)+1, levels(q_ind)
-                 if (nproc .eq. 0)                                               &
-                    write(6,*) 'READFVregional : q ',                           &
-                         & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-             enddo
-
-        endif
-        if(tv_ind > 0) then
-           do k=1,nlevs
-            do j=1,ny_res
-              do i=1,nx_res
-               workvar3d(i,j,k)=tsenworkvar3d(i,j,k)*(one+fv*qworkvar3d(i,j,k))
-              enddo
-             enddo
-            enddo
-            tvworkvar3d=workvar3d
-        else! tsen_id >0
-           workvar3d=tsenworkvar3d
-        endif
-           tmp_ind=max(tv_ind,tsen_ind) !then can't be both >0 
-           do k=1,nlevs
-               nn = nn_tile0
-             do j=1,ny_res
-              do i=1,nx_res
-                 nn=nn+1
-                 vargrid(nn,levels(tmp_ind-1)+k,nb,ne)=workvar3d(i,j,k) 
-              enddo
-             enddo
-           enddo
-           do k = levels(tmp_ind-1)+1, levels(tmp_ind)
-              if (nproc .eq. 0)   then                                           
-                 write(6,*) 'READFVregional : t ',                           &
-                     & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-              endif
-           enddo
-
-        endif
-   if(allocated(tsenworkvar3d)) deallocate(tsenworkvar3d)
-           
-
-    
-   if (oz_ind > 0) then
-       varstrname = 'o3mr'
-       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-      do k=1,nlevs
-          nn = nn_tile0
-        do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            vargrid(nn,levels(oz_ind-1)+k,nb,ne)=workvar3d(i,j,k) 
-         enddo
-        enddo
-      enddo
-      do k = levels(oz_ind-1)+1, levels(oz_ind)
-          if (nproc .eq. 0)                                               &
-             write(6,*) 'READFVregional : oz ',                           &
-                 & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-       enddo
-
-    endif
-
-   if (ql_ind > 0) then
-       varstrname = 'liq_wat'
-       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-      do k=1,nlevs
-          nn = nn_tile0
-        do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            vargrid(nn,levels(ql_ind-1)+k,nb,ne)=workvar3d(i,j,k)
-         enddo
-        enddo
-      enddo
-      do k = levels(ql_ind-1)+1, levels(ql_ind)
-          if (nproc .eq. 0)                                               &
-             write(6,*) 'READFVregional : ql ',                           &
-                 & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-       enddo
-
-    endif
-
-   if (qi_ind > 0) then
-       varstrname = 'ice_wat'
-       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-      do k=1,nlevs
-          nn = nn_tile0
-        do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            vargrid(nn,levels(qi_ind-1)+k,nb,ne)=workvar3d(i,j,k)
-         enddo
-        enddo
-      enddo
-      do k = levels(qi_ind-1)+1, levels(qi_ind)
-          if (nproc .eq. 0)                                               &
-             write(6,*) 'READFVregional : qi ',                           &
-                 & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-       enddo
-
-    endif
-
-   if (qr_ind > 0) then
-       varstrname = 'rainwat'
-       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-      do k=1,nlevs
-          nn = nn_tile0
-        do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            vargrid(nn,levels(qr_ind-1)+k,nb,ne)=workvar3d(i,j,k)
-         enddo
-        enddo
-      enddo
-      do k = levels(qr_ind-1)+1, levels(qr_ind)
-          if (nproc .eq. 0)                                               &
-             write(6,*) 'READFVregional : qr ',                           &
-                 & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-       enddo
-
-    endif
-
-   if (qs_ind > 0) then
-       varstrname = 'snowwat'
-       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-      do k=1,nlevs
-          nn = nn_tile0
-        do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            vargrid(nn,levels(qs_ind-1)+k,nb,ne)=workvar3d(i,j,k)
-         enddo
-        enddo
-      enddo
-      do k = levels(qs_ind-1)+1, levels(qs_ind)
-          if (nproc .eq. 0)                                               &
-             write(6,*) 'READFVregional : qs ',                           &
-                 & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-       enddo
-
-    endif
-
-   if (qg_ind > 0) then
-       varstrname = 'graupel'
-       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-      do k=1,nlevs
-          nn = nn_tile0
-        do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            vargrid(nn,levels(qg_ind-1)+k,nb,ne)=workvar3d(i,j,k)
-         enddo
-        enddo
-      enddo
-      do k = levels(qg_ind-1)+1, levels(qg_ind)
-          if (nproc .eq. 0)                                               &
-             write(6,*) 'READFVregional : qg ',                           &
-                 & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-       enddo
-
-    endif
-
-   if (qnr_ind > 0) then
-       varstrname = 'rain_nc'
-       call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-       call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-      do k=1,nlevs
-          nn = nn_tile0
-        do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            vargrid(nn,levels(qnr_ind-1)+k,nb,ne)=workvar3d(i,j,k)
-         enddo
-        enddo
-      enddo
-      do k = levels(qnr_ind-1)+1, levels(qnr_ind)
-          if (nproc .eq. 0)                                               &
-             write(6,*) 'READFVregional : qnr ',                           &
-                 & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
-       enddo
-
-    endif
-   
-    ! set SST to zero for now
-    if (sst_ind > 0) then
-       vargrid(:,levels(n3d)+sst_ind,nb,ne) = zero
-    endif
-
-
-    !----------------------------------------------------------------------
-    ! Allocate memory for variables computed within routine
- 
-    if (ps_ind > 0) then
-      allocate(workprsi(nx_res,ny_res,nlevsp1))
-      allocate(pswork(nx_res,ny_res))
-      call fv3lamfile%get_idfn('delp',file_id,fv3filename)
-      call read_fv3_restart_data3d('delp',fv3filename,file_id,workvar3d)  
-       !print *,'min/max delp',ntile,minval(delp),maxval(delp)
-      workprsi(:,:,nlevsp1)=eta1_ll(nlevsp1) !etal_ll is needed
-      do i=nlevs,1,-1
-        workprsi(:,:,i)=workvar3d(:,:,i)*0.01_r_kind+workprsi(:,:,i+1)
-      enddo
- 
-      pswork(:,:)=workprsi(:,:,1)
-
-
-
-      nn = nn_tile0
-      do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            vargrid(nn,levels(n3d)+ps_ind, nb,ne) =pswork(i,j) 
-         enddo
-      enddo
-
-      
-      
-
-      
-      do k=1,nlevs
-        do j=1,ny_res  
-         do i=1,nx_res
-           workvar3d(i,j,k)=(workprsi(i,j,k)+workprsi(i,j,k+1))*half
-         enddo
-        enddo
-      enddo
-      ice=.true.  !tothink
-      if (pseudo_rh) then
-        call genqsat1(qworkvar3d,qsatworkvar3d,workvar3d,tvworkvar3d,ice,  &
-                     nx_res*ny_res,nlevs)
-      else
-        qsatworkvar3d(:,:,:) = 1._r_double
+        charnanal = 'ensmean'
       endif
+
+      do ntile=1,ntiles
+        nn_tile0=(ntile-1)*nx_res*ny_res
+        write(char_tile, '(i1)') ntile
+
+        filename = "fv3sar_tile"//char_tile//"_"//trim(charnanal)
+        if(l_fv3reg_filecombined) then
+           fv3filename=trim(adjustl(filename))//"_dynvartracer"
+           call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_nowrite,file_id),&
+                      myname_,'open: '//trim(adjustl(fv3filename)) )
+           call fv3lamfile%setupfile(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
+        else
+           fv3filename=trim(adjustl(filename))//"_dynvars"
+           call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_nowrite,file_id),&
+                      myname_,'open: '//trim(adjustl(fv3filename)) )
+           fv3filename1=trim(adjustl(filename))//"_tracer"
+           call nc_check( nf90_open(trim(adjustl(fv3filename1)),nf90_nowrite,file_id1),&
+                      myname_,'open: '//trim(adjustl(fv3filename1)) )
+           call fv3lamfile%setupfile(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename))  , &
+                                         fileid2=file_id1,fv3fn2=trim(adjustl(fv3filename1)) )
+           
+        endif 
+
+      !----------------------------------------------------------------------
+      ! read u-component
+
+      !----------------------------------------------------------------------
+      ! Update u and v variables (same for NMM and ARW)
+        
+      if (u_ind > 0) then
+      allocate(uworkvar3d(nx_res,ny_res+1,nlevs))
+        varstrname = 'u'
+        call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,uworkvar3d)
+        do k=1,nlevs
+            nn = nn_tile0
+          do j=1,ny_res
+           do i=1,nx_res
+              nn=nn+1
+              vargrid(nn,levels(u_ind-1)+k,nb,ne)=uworkvar3d(i,j,k) 
+           enddo
+          enddo
+        enddo
+        do k = levels(u_ind-1)+1, levels(u_ind)
+            if (nproc .eq. 0)                                               &
+               write(6,*) 'READFVregional : u ',                           &
+                   & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+        enddo
+
+      deallocate(uworkvar3d)
+      endif
+      if (v_ind > 0) then
+      allocate(vworkvar3d(nx_res+1,ny_res,nlevs))
+         varstrname = 'v'
+         call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+         call read_fv3_restart_data3d(varstrname,fv3filename,file_id,vworkvar3d)
       do k=1,nlevs
-          nn = nn_tile0
-      do j=1,ny_res
-         do i=1,nx_res
-            nn=nn+1
-            qsat(nn,k,nb,ne)=qsatworkvar3d(i,j,k) 
+         nn = nn_tile0
+         do j=1,ny_res
+           do i=1,nx_res
+              nn=nn+1
+              vargrid(nn,levels(v_ind-1)+k,nb,ne)=vworkvar3d(i,j,k) 
+           enddo
          enddo
       enddo
+      do k = levels(v_ind-1)+1, levels(v_ind)
+          if (nproc .eq. 0)                                               &
+               write(6,*) 'READFVregional : v ',                           &
+                   & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
       enddo
-            
-          
+      deallocate(vworkvar3d)
+
+      endif
+      if (w_ind > 0) then
+      allocate(wworkvar3d(nx_res,ny_res,nlevs))
+         varstrname = 'W'
+         call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+         call read_fv3_restart_data3d(varstrname,fv3filename,file_id,wworkvar3d)
+      do k=1,nlevs
+         nn = nn_tile0
+         do j=1,ny_res
+           do i=1,nx_res
+              nn=nn+1
+              vargrid(nn,levels(w_ind-1)+k,nb,ne)=wworkvar3d(i,j,k)
+           enddo
+         enddo
+      enddo
+      do k = levels(w_ind-1)+1, levels(w_ind)
+          if (nproc .eq. 0)                                               &
+               write(6,*) 'READFVregional : w ',                           &
+                   & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+      enddo
+      deallocate(wworkvar3d)
+
+      endif
+
+      if (tv_ind > 0.or.tsen_ind) then
+         allocate(tsenworkvar3d(nx_res,ny_res,nlevs))
+         varstrname = 'T'
+         call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+         call read_fv3_restart_data3d(varstrname,fv3filename,file_id,tsenworkvar3d)
+         varstrname = 'sphum'
+         call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+         call read_fv3_restart_data3d(varstrname,fv3filename,file_id,qworkvar3d)
+
+
+         if (q_ind > 0) then
+             varstrname = 'sphum'
+             do k=1,nlevs
+                nn = nn_tile0
+                do j=1,ny_res
+                   do i=1,nx_res
+                      nn=nn+1
+                      vargrid(nn,levels(q_ind-1)+k,nb,ne)=qworkvar3d(i,j,k) 
+                    enddo
+                 enddo
+              enddo
+              do k = levels(q_ind-1)+1, levels(q_ind)
+                   if (nproc .eq. 0)                                               &
+                      write(6,*) 'READFVregional : q ',                           &
+                           & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+              enddo
+
+          endif
+          if(tv_ind > 0) then
+             do k=1,nlevs
+              do j=1,ny_res
+                do i=1,nx_res
+                 workvar3d(i,j,k)=tsenworkvar3d(i,j,k)*(one+fv*qworkvar3d(i,j,k))
+                enddo
+               enddo
+              enddo
+              tvworkvar3d=workvar3d
+          else! tsen_id >0
+             workvar3d=tsenworkvar3d
+          endif
+             tmp_ind=max(tv_ind,tsen_ind) !then can't be both >0 
+             do k=1,nlevs
+                 nn = nn_tile0
+               do j=1,ny_res
+                do i=1,nx_res
+                   nn=nn+1
+                   vargrid(nn,levels(tmp_ind-1)+k,nb,ne)=workvar3d(i,j,k) 
+                enddo
+               enddo
+             enddo
+             do k = levels(tmp_ind-1)+1, levels(tmp_ind)
+                if (nproc .eq. 0)   then                                           
+                   write(6,*) 'READFVregional : t ',                           &
+                       & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+                endif
+             enddo
+      endif
+
+      if(allocated(tsenworkvar3d)) deallocate(tsenworkvar3d)
+              
+
+       
+      if (oz_ind > 0) then
+          varstrname = 'o3mr'
+          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+          call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
+         do k=1,nlevs
+             nn = nn_tile0
+           do j=1,ny_res
+            do i=1,nx_res
+               nn=nn+1
+               vargrid(nn,levels(oz_ind-1)+k,nb,ne)=workvar3d(i,j,k) 
+            enddo
+           enddo
+         enddo
+         do k = levels(oz_ind-1)+1, levels(oz_ind)
+             if (nproc .eq. 0)                                               &
+                write(6,*) 'READFVregional : oz ',                           &
+                    & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+          enddo
+
+      endif
+
+      if (ql_ind > 0) then
+          varstrname = 'liq_wat'
+          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+          call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
+         do k=1,nlevs
+             nn = nn_tile0
+           do j=1,ny_res
+            do i=1,nx_res
+               nn=nn+1
+               vargrid(nn,levels(ql_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+            enddo
+           enddo
+         enddo
+         do k = levels(ql_ind-1)+1, levels(ql_ind)
+             if (nproc .eq. 0)                                               &
+                write(6,*) 'READFVregional : ql ',                           &
+                    & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+          enddo
+
+      endif
+
+      if (qi_ind > 0) then
+          varstrname = 'ice_wat'
+          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+          call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
+         do k=1,nlevs
+             nn = nn_tile0
+           do j=1,ny_res
+            do i=1,nx_res
+               nn=nn+1
+               vargrid(nn,levels(qi_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+            enddo
+           enddo
+         enddo
+         do k = levels(qi_ind-1)+1, levels(qi_ind)
+             if (nproc .eq. 0)                                               &
+                write(6,*) 'READFVregional : qi ',                           &
+                    & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+         enddo
+
+      endif
+
+      if (qr_ind > 0) then
+          varstrname = 'rainwat'
+          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+          call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
+         do k=1,nlevs
+             nn = nn_tile0
+           do j=1,ny_res
+            do i=1,nx_res
+               nn=nn+1
+               vargrid(nn,levels(qr_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+            enddo
+           enddo
+         enddo
+         do k = levels(qr_ind-1)+1, levels(qr_ind)
+             if (nproc .eq. 0)                                               &
+                write(6,*) 'READFVregional : qr ',                           &
+                    & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+          enddo
+
+      endif
+
+      if (qs_ind > 0) then
+         varstrname = 'snowwat'
+         call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+         call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
+         do k=1,nlevs
+             nn = nn_tile0
+           do j=1,ny_res
+            do i=1,nx_res
+               nn=nn+1
+               vargrid(nn,levels(qs_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+            enddo
+           enddo
+         enddo
+         do k = levels(qs_ind-1)+1, levels(qs_ind)
+             if (nproc .eq. 0)                                               &
+                write(6,*) 'READFVregional : qs ',                           &
+                    & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+         enddo
+
+      endif
+
+      if (qg_ind > 0) then
+         varstrname = 'graupel'
+         call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+         call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
+         do k=1,nlevs
+           nn = nn_tile0
+           do j=1,ny_res
+             do i=1,nx_res
+               nn=nn+1
+               vargrid(nn,levels(qg_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+             enddo
+           enddo
+         enddo
+         do k = levels(qg_ind-1)+1, levels(qg_ind)
+             if (nproc .eq. 0)                                               &
+                write(6,*) 'READFVregional : qg ',                           &
+                    & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+         enddo
+
+       endif
+
+       if (qnr_ind > 0) then
+         varstrname = 'rain_nc'
+         call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+         call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
+         do k=1,nlevs
+             nn = nn_tile0
+           do j=1,ny_res
+            do i=1,nx_res
+               nn=nn+1
+               vargrid(nn,levels(qnr_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+            enddo
+           enddo
+         enddo
+         do k = levels(qnr_ind-1)+1, levels(qnr_ind)
+             if (nproc .eq. 0)                                               &
+                write(6,*) 'READFVregional : qnr ',                           &
+                    & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+          enddo
+
+       endif
+      
+       ! set SST to zero for now
+       if (sst_ind > 0) then
+          vargrid(:,levels(n3d)+sst_ind,nb,ne) = zero
+       endif
+
+
+       !----------------------------------------------------------------------
+       ! Allocate memory for variables computed within routine
+    
+       if (ps_ind > 0) then
+         allocate(workprsi(nx_res,ny_res,nlevsp1))
+         allocate(pswork(nx_res,ny_res))
+         call fv3lamfile%get_idfn('delp',file_id,fv3filename)
+         call read_fv3_restart_data3d('delp',fv3filename,file_id,workvar3d)  
+          !print *,'min/max delp',ntile,minval(delp),maxval(delp)
+         workprsi(:,:,nlevsp1)=eta1_ll(nlevsp1) !etal_ll is needed
+         do i=nlevs,1,-1
+           workprsi(:,:,i)=workvar3d(:,:,i)*0.01_r_kind+workprsi(:,:,i+1)
+         enddo
+    
+         pswork(:,:)=workprsi(:,:,1)
+
+         nn = nn_tile0
+         do j=1,ny_res
+            do i=1,nx_res
+               nn=nn+1
+               vargrid(nn,levels(n3d)+ps_ind, nb,ne) =pswork(i,j) 
+            enddo
+         enddo
+
+         
+         
+
+         
+         do k=1,nlevs
+           do j=1,ny_res  
+            do i=1,nx_res
+              workvar3d(i,j,k)=(workprsi(i,j,k)+workprsi(i,j,k+1))*half
+            enddo
+           enddo
+         enddo
+         ice=.true.  !tothink
+         if (pseudo_rh) then
+           call genqsat1(qworkvar3d,qsatworkvar3d,workvar3d,tvworkvar3d,ice,  &
+                        nx_res*ny_res,nlevs)
+         else
+           qsatworkvar3d(:,:,:) = 1._r_double
+         endif
+         do k=1,nlevs
+             nn = nn_tile0
+         do j=1,ny_res
+            do i=1,nx_res
+               nn=nn+1
+               qsat(nn,k,nb,ne)=qsatworkvar3d(i,j,k) 
+            enddo
+         enddo
+         enddo
+               
+             
 
 
 
-      if(allocated(workprsi))     deallocate(workprsi)
-      if(allocated(pswork))     deallocate(pswork)
-      if(allocated(tvworkvar3d)) deallocate(tvworkvar3d)
-      if(allocated(qworkvar3d)) deallocate(qworkvar3d)
-      if(allocated(qsatworkvar3d)) deallocate(qsatworkvar3d)
-    endif
-      if(l_fv3reg_filecombined) then
-        call nc_check( nf90_close(file_id),&
-          myname_,'close '//trim(filename) )
-      else
-       do ifile=1,2
-        file_id=fv3lamfile%fv3lam_fileid(ifile)
-        filename=fv3lamfile%fv3lamfilename(ifile)
-        call nc_check( nf90_close(file_id),&
-          myname_,'close '//trim(filename) )
-       enddo
-     endif 
-    !======================================================================
-    ! Deallocate memory 
-    if(allocated(workvar3d))             deallocate(workvar3d)
-     end do ! ntile loop
+         if(allocated(workprsi))     deallocate(workprsi)
+         if(allocated(pswork))     deallocate(pswork)
+         if(allocated(tvworkvar3d)) deallocate(tvworkvar3d)
+         if(allocated(qworkvar3d)) deallocate(qworkvar3d)
+         if(allocated(qsatworkvar3d)) deallocate(qsatworkvar3d)
+       endif
+       if(l_fv3reg_filecombined) then
+         call nc_check( nf90_close(file_id),&
+              myname_,'close '//trim(filename) )
+       else
+         do ifile=1,2
+            file_id=fv3lamfile%fv3lam_fileid(ifile)
+            filename=fv3lamfile%fv3lamfilename(ifile)
+            call nc_check( nf90_close(file_id),&
+            myname_,'close '//trim(filename) )
+         enddo
+       endif 
+       !======================================================================
+       ! Deallocate memory 
+       if(allocated(workvar3d))             deallocate(workvar3d)
+      end do ! ntile loop
 
     end do backgroundloop ! loop over backgrounds to read in
     end do ensmemloop ! loop over ens members to read in 
@@ -657,10 +655,10 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
        call stop2(23)
     endif
     ne = 0
-    ensmemloop: do nanal=nanal1,nanal2
+  ensmemloop: do nanal=nanal1,nanal2
     ne = ne + 1
 
-    backgroundloop: do nb=1,nbackgrounds
+  backgroundloop: do nb=1,nbackgrounds
     allocate(workinc3d(nx_res,ny_res,nlevs),workinc3d2(nx_res,ny_res,nlevsp1))
     allocate(workvar3d(nx_res,ny_res,nlevs))
     allocate(qworkvar3d(nx_res,ny_res,nlevs))
@@ -683,7 +681,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
          fv3filename=trim(adjustl(filename))//"_dynvartracer"
          call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_write,file_id),&
                     myname_,'open: '//trim(adjustl(fv3filename)) )
-         call fv3lamfile%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
+         call fv3lamfile%setupfile(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
       else
          fv3filename=trim(adjustl(filename))//"_dynvars"
          call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_write,file_id),&
@@ -691,7 +689,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
          fv3filename1=trim(adjustl(filename))//"_tracer"
          call nc_check( nf90_open(trim(adjustl(fv3filename1)),nf90_write,file_id1),&
                     myname_,'open: '//trim(adjustl(fv3filename1)) )
-         call fv3lamfile%setupfilebank(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename))  , &
+         call fv3lamfile%setupfile(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename))  , &
                                        fileid2=file_id1,fv3fn2=trim(adjustl(fv3filename1)) )
          
       endif 
@@ -1050,30 +1048,30 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
         myname_,'close '//trim(filename) )
     else
       do ifile=1,2
-      file_id=fv3lamfile%fv3lam_fileid(ifile)
-      filename=fv3lamfile%fv3lamfilename(ifile)
-      call nc_check( nf90_close(file_id),&
-        myname_,'close '//trim(filename) )
-      enddo
+        file_id=fv3lamfile%fv3lam_fileid(ifile)
+        filename=fv3lamfile%fv3lamfilename(ifile)
+        call nc_check( nf90_close(file_id),&
+              myname_,'close '//trim(filename) )
+       enddo
      endif
 
 
     !----------------------------------------------------------------------
     ! update time stamp is to be considered NSTART_HOUR in NMM (HWRF) restart file.
     !======================================================================
-     end do ! tiles
+    end do ! tiles
     if(allocated(workinc3d))     deallocate(workinc3d)
     if(allocated(workinc3d2))     deallocate(workinc3d2)
     if(allocated(workprsi))     deallocate(workprsi)
-   if(allocated(pswork))     deallocate(pswork)
-   if(allocated(tvworkvar3d)) deallocate(tvworkvar3d)
-   if(allocated(qworkvar3d)) deallocate(qworkvar3d)
+    if(allocated(pswork))     deallocate(pswork)
+    if(allocated(tvworkvar3d)) deallocate(tvworkvar3d)
+    if(allocated(qworkvar3d)) deallocate(qworkvar3d)
 
 
 
   
-    end do backgroundloop ! loop over backgrounds to read in
-    end do ensmemloop ! loop over ens members to read in
+  end do backgroundloop ! loop over backgrounds to read in
+  end do ensmemloop ! loop over ens members to read in
 
 
     ! Return calculated values
@@ -1146,7 +1144,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
     real(r_single), dimension(npts,ndim,nbackgrounds,1), intent(inout) :: grdin
     logical, intent(in) :: no_inflate_flag
   end subroutine writegriddata_pnc
-  subroutine type_bound_setupfilebank(this,fileid1,fv3fn1,fileid2,fv3fn2)
+  subroutine type_bound_setupfile(this,fileid1,fv3fn1,fileid2,fv3fn2)
        class (type_fv3lamfile) :: this  
        integer(i_kind) fileid1
        integer(i_kind), optional :: fileid2
@@ -1163,7 +1161,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
          this%fv3lamfilename(1)=fv3fn1
          this%fv3lam_fileid(1)=fileid1
        endif
-   end subroutine type_bound_setupfilebank
+   end subroutine type_bound_setupfile
    subroutine type_bound_getidfn(this,vnamloc,fileid,fv3fn)
    class (type_fv3lamfile) :: this  
    integer(i_kind) fileid
@@ -1191,10 +1189,10 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
      integer(i_kind) i
      ifindstrloc=0
      do i=1,size(str_array)
-      if(trim(str_array(i)) == trim(strin)) then
-        ifindstrloc=i
-        exit
-      endif
+       if(trim(str_array(i)) == trim(strin)) then
+         ifindstrloc=i
+         exit
+        endif
      enddo
    end function ifindstrloc
 
