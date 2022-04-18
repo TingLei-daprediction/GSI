@@ -113,7 +113,7 @@ integer (i_kind),allocatable,dimension(:):: mpi_id_group
 integer(i_kind):: world_group,pe_group
 integer (i_kind):: mpi_comm_userread,ierror,iope,nxloc,nyloc,ipe,jpe
 character(len=24) strsubid
-integer(i_kind)::ii
+integer(i_kind)::ii,nx_res1,ny_res1
 integer(i_kind):: iocomtest,iret,nproc1
 write (6,*)"The input fileprefix, reducedgrid are not used in the current implementation", &
            fileprefix, reducedgrid
@@ -196,10 +196,9 @@ if (nproc .eq. 0) then
 
      endif !nproc=0 
      
-    call mpi_bcast(nxlocgroup,size(nxlocgroup),mpi_integer,0,MPI_COMM_WORLD,ierr) ! cltthink
-    call mpi_bcast(nylocgroup,size(nxlocgroup),mpi_integer,0,MPI_COMM_WORLD,ierr) !cltthink
+    call mpi_bcast(nxlocgroup,size(nxlocgroup),mpi_integer,0,MPI_COMM_WORLD,ierr) ! 
+    call mpi_bcast(nylocgroup,size(nxlocgroup),mpi_integer,0,MPI_COMM_WORLD,ierr) !
       numproc_io_sub=fv3_io_layout_ny*fv3_io_layout_nx
-      write(6,*)"thinkdeb ",nxlocgroup,nylocgroup
       allocate(recvcounts2d(numproc_io_sub),displs2d(numproc_io_sub))
       allocate(mpi_id_group(numproc_io_sub))
       allocate(ij_pe(2,0:numproc_io_sub-1))
@@ -217,9 +216,12 @@ if (nproc .eq. 0) then
        end do
       enddo 
       
-     nx_res=sum(nxlocgroup(:,1))
-     ny_res=sum(nylocgroup(1,:))
-     write(6,*)'thinkdeb x_res ',nx_res,ny_res
+     nx_res1=sum(nxlocgroup(:,1))
+     ny_res1=sum(nylocgroup(1,:))
+     if(nx_res1.ne.nx_res.or.ny_res1.ne.ny_res) then
+       write(6,*)'something wroing with dimensions of the whole domain and dimensions in subdomains, stop '
+       call stop2(25)
+     endif
 
 
     ij=0
@@ -227,7 +229,6 @@ if (nproc .eq. 0) then
       do i=1,fv3_io_layout_nx
       ij_pe(1,ij)=i
       ij_pe(2,ij)=j
-      write(6,*)'thinkdebij net is ij ',i,j,ij
 !for N 
       if(j.lt.fv3_io_layout_ny) then
          myneb_table(1,ij)=j*fv3_io_layout_nx+i-1
@@ -252,8 +253,6 @@ if (nproc .eq. 0) then
       else
          myneb_table(4,ij)=-1
       endif
-      
-      write(6,*)'thinkdeb ij, table ',myneb_table(:,ij)
 
       ij=ij+1
       enddo
@@ -266,8 +265,6 @@ if (nproc .eq. 0) then
      if(any (mpi_id_group == nproc))  then ! if paranc=.fales., this equal to "nproc== 00 
        call MPI_GROUP_INCL(world_group, numproc_io_sub, mpi_id_group, pe_group, ierror)
        call MPI_COMM_CREATE_GROUP(MPI_COMM_WORLD, pe_group, 0, mpi_comm_userread, ierror)
-       write(6,*)'thinkdebxyz 2',nproc,mpi_comm_userread,mpi_comm_world
-       write(6,*)'thinkdebierror is ',ierror
      endif
         write(char_nxres, '(i4)') nx_res
         write(char_nyres, '(i4)') ny_res
@@ -281,10 +278,8 @@ if (nproc .eq. 0) then
         npts=nx_res*ny_res
         allocate(latsgrd(npts),lonsgrd(npts))
         endif
-     write(6,*)'thinkdeb ',mpi_id_group
      if(any (mpi_id_group == nproc))  then ! if paranc=.fales., this equal to "nproc== 00 
        call mpi_comm_rank(mpi_comm_userread,iope, ierror)
-        write(6,*)"thinkdebnproc is ",nproc,iope
        if(iope.ne.nproc) then
          write(6,*) "it is assumed the so generated subgroup of mpi should & 
           match the first N (size of the fomer) MPI process of the total MPI group, if not, & 
@@ -300,7 +295,6 @@ if (nproc .eq. 0) then
         jpe=ij_pe(2,nproc)
         nxloc=nxlocgroup(ipe,jpe)
         nyloc=nylocgroup(ipe,jpe)
-        write(6,*)'thinkdeb nxloc,nyloc ',ipe,jpe,nxloc,nyloc
       
         allocate(loclat_tile(nxloc,nyloc),loclon_tile(nxloc,nyloc))
         do ntile=1,ntiles
@@ -324,13 +318,9 @@ if (nproc .eq. 0) then
                 !print *,'min/max lat_tile',ntile,minval(lat_tile),maxval(lat_tile)
                 call nc_check( nf90_close(file_id),&
                 myname_,'close '//trim(filename) )
-            write(6,*)'thinkdebloclat is  ',loclat_tile(1,1)
         if(paranc) then
 !  call mpi_gatherv(ug3d, recvcounts(iope+1), mpi_real4, ug3d_0, recvcounts, displs,&
 !                   mpi_real4, 0, iocomms(mem_pe(nproc)),iret)
-           write(6,*)'thinkdebb sizenproc ',nproc,size(loclat_tile),recvcounts2d(nproc+1),size(lat_tile)
-           write(6,*)"thinkdebb 2 rev,displ ",recvcounts2d,displs2d
-           call flush(6)
            call mpi_gatherv(loclat_tile, recvcounts2d(nproc+1), mpi_real4, lat_tile, recvcounts2d, displs2d,&
                    mpi_real4, 0,mpi_comm_userread ,ierror)
            call mpi_gatherv(loclon_tile, recvcounts2d(nproc+1), mpi_real4, lon_tile, recvcounts2d, displs2d,&
@@ -418,7 +408,6 @@ if (nproc .eq. 0) then
        enddo
 
       ps = g_prsi(:,:,1)
-      print *,'thinkdebmin/max ps',ntile,minval(ps),maxval(ps)
       nn=nn_tile0
       do j=1,ny_res
          do i=1,nx_res
@@ -476,7 +465,6 @@ if (nproc .ne. 0) then
    allocate(eta1_ll(nlevsp1),eta2_ll(nlevsp1))
 endif
 !call mpi_bcast(logp,npts*nlevs_pres,mpi_real4,0,MPI_COMM_WORLD,ierr)
-  write(6,*)"thinkdebnpts is ",npts
   if(nproc==0) write(6,*)logp(1,:)
   call flush(6)
 do k=1,nlevs_pres

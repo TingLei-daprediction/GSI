@@ -1152,7 +1152,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
                         vworkvar3d,tvworkvar3d,tsenworkvar3d,&
                         workprsi,qworkvar3d
     real(r_single), dimension(:,:,:), allocatable ::locworkvar3d,locuworkvar3d,&
-                        locvworkvar3d,loctvworkvar3d,loctsenworkvar3d,&
+                        locvworkvar3d,loctsenworkvar3d,&
                         locqworkvar3d
     real(r_double),dimension(:,:,:),allocatable:: qsatworkvar3d
     real(r_single), dimension(:,:),   allocatable ::pswork
@@ -1220,21 +1220,15 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
   enddo
  ne=1 
  nb=1
-do i=0,numproc-1
- write(6,*)'thinkdeb mem_pe is ',mem_pe(i)
-enddo
-!clt  do i=0,numproc-1
-!clt    mem_pe(i) = imem
-!clt    imem = imem + 1
-!clt    if (imem > nanals) imem = 1
-!clt  end do
+ do i=0,numproc-1
+   write(6,*)' mem_pe is ',mem_pe(i)
+ enddo
   nanal = mem_pe(nproc)
 
   call mpi_comm_split(mpi_comm_world, mem_pe(nproc), nproc, iocomms(mem_pe(nproc)), iret)
   call mpi_comm_split(mpi_comm_world, 1, nproc, iocomtest, iret)
   call mpi_comm_rank(iocomms(mem_pe(nproc)), iope, iret)
   call mpi_comm_size(iocomms(mem_pe(nproc)), ionumproc, iret)
-  write(6,*)'thinkdebxxxxx ',nproc,mem_pe(nproc),iocomms(mem_pe(nproc)),iocomtest,iope
   
    
   
@@ -1259,8 +1253,6 @@ enddo
       nyloc=nylocgroup(i,j)
       ii=(j-1)*fv3_io_layout_nx+i-1 
       write(strsubid,'(a,I4.4)')'.',ii
-!clt      write(strsubid,'(a,I4.4,a,I4.4)')'.X',i,'Y',j
-      write(6,*)'thinkdebr strsubid nx,nyloc is ',trim(strsubid),' ',nxloc,nyloc
       allocate(locworkvar3d(nxloc,nyloc,nlevs))
 
 
@@ -1272,7 +1264,6 @@ enddo
          call fv3lamfile%setupfile(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
       else
          fv3filename=trim(adjustl(filename))//"_dynvars"//trim(strsubid)
-         write(6,*)'thinkdebr filename is ',trim(fv3filename)
 
          call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_nowrite,file_id),&
                     myname_,'open: '//trim(adjustl(fv3filename)) )
@@ -1298,15 +1289,10 @@ enddo
          allocate(uworkvar3d(1,1,nlevs))
        endif
         allocate(locuworkvar3d(nxloc,nyloc+1,nlevs))
-         write(6,*)'thinkdebr in u_ind, nxloc,nyloc ',nxloc,nyloc,nlevs
            
           varstrname = 'u'
           call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-          write(6,*)'thinkdebr before u filenamevarname is ',trim(fv3filename),trim(varstrname)
-          call flush(6)
           call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locuworkvar3d)
-          write(6,*)'thinkdebrafter u filename is ',trim(fv3filename)
-          call flush(6)
         do k=1,nlevs
            call mpi_gatherv(locuworkvar3d(1:nxloc,1:nyloc,k), recvcounts2d(iope+1), mpi_real4, workvar2d, recvcounts2d, displs2d,&
                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
@@ -1806,7 +1792,7 @@ enddo
                         vworkvar3d,tvworkvar3d,tsenworkvar3d,&
                         workprsi,qworkvar3d,workinc3d,workinc3d2
     real(r_single), dimension(:,:,:), allocatable ::locworkvar3d,locuworkvar3d,&
-                        locvworkvar3d,loctvworkvar3d,loctsenworkvar3d,&
+                        locvworkvar3d,loctsenworkvar3d,&
                         locqworkvar3d
     real(r_single), dimension(:,:),allocatable :: loc2dsend,loc2drecv
     real(r_single), dimension(:,:),allocatable :: workvar2d
@@ -1814,14 +1800,14 @@ enddo
     real(r_single), dimension(:,:),   allocatable ::pswork
     real(r_single)              :: clip
     integer(i_kind), dimension(:),   allocatable ::my_neb
-    integer(i_kind):: itag=0,mpistatus(mpi_status_size)=0
+    integer(i_kind):: mpistatus(mpi_status_size)=0
     integer(i_kind):: irequest
     ! Define counting variables
     character(len=12) :: varstrname
     character(len=1) char_tile
     character(len=24) strsubid
     integer :: nlevsp1
-    integer :: i,j,ii, k,ianal,nn,ntile,nn_tile0, nb,nanal,ne,iret,ierror,istat
+    integer :: i,j,ii, k,nn,ntile,nn_tile0, nb,nanal,ne,iret,ierror
     integer :: irec,isend
     integer :: u_ind, v_ind, tv_ind,tsen_ind, q_ind, oz_ind
     integer :: w_ind, ql_ind, qi_ind, qr_ind, qs_ind, qg_ind, qnr_ind
@@ -1853,7 +1839,6 @@ enddo
     ps_ind  = getindex(vars2d, 'ps')  ! Ps (2D)
 
 
-  write(6,*)'thinkdebxxxxxw  ',nproc,mem_pe(nproc),iocomms(mem_pe(nproc)), iope,iocomms(mem_pe(nproc))
     allocate(my_neb(4))
     !----------------------------------------------------------------------
     if (nbackgrounds > 1) then
@@ -1883,10 +1868,6 @@ enddo
       nyloc=nylocgroup(i,j)
       ii=(j-1)*fv3_io_layout_nx+i-1 
       write(strsubid,'(a,I4.4)')'.',ii
-!      write(strsubid,'(a,I4.4,a,I4.4)')'.X',i,'Y',j
-      write(6,*)'thinkdeb nxloc,nyloc are ',nxloc,nyloc
-      write(6,*)'thinkdeb strubid is ',trim(strsubid)
-      call flush(6)
       allocate(locworkvar3d(nxloc,nyloc,nlevs))
 
        !----------------------------------------------------------------------
@@ -1907,7 +1888,6 @@ enddo
             call fv3lamfile%setupfile(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
          else
             fv3filename=trim(adjustl(filename))//"_dynvars"//trim(strsubid)
-            write(6,*)'thinkdeb filename0 is ',trim(fv3filename)
             call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_write,file_id),&
                        myname_,'open: '//trim(adjustl(fv3filename)) )
             fv3filename1=trim(adjustl(filename))//"_tracer"//trim(strsubid)
@@ -1932,12 +1912,8 @@ enddo
             allocate(locuworkvar3d(nxloc,nyloc+1,nlevs))
              
             call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
-            write(6,*)'thinkdebfilename is ',trim(fv3filename)
-            call flush(6)
             
             call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locuworkvar3d)
-            write(6,*)'thinkdeb xxx1'
-            call flush(6)
             do k=1,nlevs
                call mpi_gatherv(locuworkvar3d(1:nxloc,1:nyloc,k), recvcounts2d(iope+1), mpi_real4, workvar2d, recvcounts2d, displs2d,&
                         mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
@@ -1963,7 +1939,6 @@ enddo
             locuworkvar3d(:,1:nyloc,:)=locworkvar3d
 
             allocate( loc2drecv(nxloc,nlevs),loc2dsend(nxloc,nlevs))  
-            write(6,*)'thinkdebxx nxloc nyloc ',nxloc,nyloc
             if (my_neb(3)>-1) then ! I have a southern neighboring subdomain
                 loc2dsend(:,:)=locuworkvar3d(:,1,:)
             call mpi_comm_rank(iocomms(mem_pe(nproc)), iope1, iret)
@@ -1978,8 +1953,7 @@ enddo
                 locuworkvar3d(:,nyloc+1,:)=loc2drecv
 
             else
-              write(6,*)'thinkdeb255'
-              locuworkvar3d(:,nyloc+1,:)=300.0 !cltthink locuworkvar3d(:,nyloc,:)
+              locuworkvar3d(:,nyloc+1,:)=locuworkvar3d(:,nyloc,:)
             endif
             call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locuworkvar3d)
             if(my_neb(3)>-1) then
@@ -2049,7 +2023,6 @@ enddo
              if (my_neb(4)>-1) then ! I have a western neighboring subdomain
              call mpi_wait(irequest, mpistatus, ierror)
              endif
-!cltthink             call mpi_wait(ihandle(4),istat,iret)
              deallocate (loc2dsend,loc2drecv)
 
          endif
@@ -2428,7 +2401,6 @@ enddo
             call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
 
          endif
-!cltdouble think
          if (ps_ind > 0) then
            if(iope == 0)   allocate(workprsi(nx_res,ny_res,nlevsp1))
            if(iope == 0)   allocate(pswork(nx_res,ny_res))
