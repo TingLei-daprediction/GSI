@@ -522,7 +522,7 @@ subroutine read_fv3_files(mype)
 ! Declare local variables
     logical(4) fexist
     character(6) filename
-    character(14) filenames
+    character(19) filenames
     integer(i_kind) in_unit
     integer(i_kind) i,j,iwan,npem1
     integer(i_kind) nhr_half
@@ -559,9 +559,17 @@ subroutine read_fv3_files(mype)
 !WWWWWW setup for one first guess file for now
       do i=0,9 !place holder for FGAT
           if ( i == 6 ) then
-            write(filenames,"(A11)") 'fv3_dynvars'
+            if(fv3_io_layout_y > 1) then
+               write(filenames,"(A16)") 'fv3_dynvars.0000'
+            else
+               write(filenames,"(A11)") 'fv3_dynvars'
+            endif
           else
-            write(filenames,"(A12,I2.2)") 'fv3_dynvars_',i
+            if(fv3_io_layout_y > 1) then
+               write(filenames,"(A17,I2.2)") 'fv3_dynvars.0000_',i
+            else
+               write(filenames,"(A12,I2.2)") 'fv3_dynvars_',i
+            endif
           endif
           INQUIRE(FILE=filenames, EXIST=fexist)
           if(.not.fexist) cycle
@@ -1336,40 +1344,24 @@ subroutine gsi_fv3ncdf2d_read(fv3filenamegin,it,ges_z,ges_t2m,ges_q2m)
              write(*,*) "wrong dimension number ndim =",ndim
              call stop2(119)
           endif
-          if(allocated(dim_id    )) deallocate(dim_id    )
-          allocate(dim_id(ndim))
           if(fv3_io_layout_y > 1) then
              do nio=0,fv3_io_layout_y-1
-               iret=nf90_inquire_variable(gfile_loc_layout(nio),i,dimids=dim_id)
-               if(allocated(sfc       )) deallocate(sfc       )
-               if(dim(dim_id(1)) == nx .and. dim(dim_id(2))==ny_layout_len(nio)) then
-                  if(ndim >=3) then
-                     allocate(sfc(dim(dim_id(1)),dim(dim_id(2)),dim(dim_id(3))))
-                     iret=nf90_get_var(gfile_loc_layout(nio),i,sfc)
-                  else if (ndim == 2) then
-                     allocate(sfc(dim(dim_id(1)),dim(dim_id(2)),1))
-                     iret=nf90_get_var(gfile_loc_layout(nio),i,sfc(:,:,1))
-                  endif
-               else
-                  write(*,*) "Mismatch dimension in surfacei reading:",nx,ny_layout_len(nio),dim(dim_id(1)),dim(dim_id(2))
-                  call stop2(119)
-               endif
-               sfc_fulldomain(:,ny_layout_b(nio):ny_layout_e(nio))=sfc(:,:,1)
+                if(allocated(sfc       )) deallocate(sfc       )
+                allocate(sfc(nx,ny_layout_len(nio),1))
+                if(ndim >=3) then
+                   iret=nf90_get_var(gfile_loc_layout(nio),i,sfc)
+                else if (ndim == 2) then
+                   iret=nf90_get_var(gfile_loc_layout(nio),i,sfc(:,:,1))
+                endif
+                sfc_fulldomain(:,ny_layout_b(nio):ny_layout_e(nio))=sfc(:,:,1)
              enddo
           else
-             iret=nf90_inquire_variable(gfile_loc,i,dimids=dim_id)
              if(allocated(sfc       )) deallocate(sfc       )
-             if(dim(dim_id(1)) == nx .and. dim(dim_id(2))==ny) then
-                if(ndim >=3) then  !the block of 10 lines is compied from GSL gsi.
-                   allocate(sfc(dim(dim_id(1)),dim(dim_id(2)),dim(dim_id(3))))
-                   iret=nf90_get_var(gfile_loc,i,sfc)
-                else if (ndim == 2) then
-                   allocate(sfc(dim(dim_id(1)),dim(dim_id(2)),1))
-                   iret=nf90_get_var(gfile_loc,i,sfc(:,:,1))
-                endif
-             else
-                write(*,*) "Mismatch dimension in surfacei reading:",nx,ny,dim(dim_id(1)),dim(dim_id(2))
-                call stop2(119)
+             allocate(sfc(nx,ny,1))
+             if(ndim >=3) then 
+                iret=nf90_get_var(gfile_loc,i,sfc)
+             else if (ndim == 2) then
+                iret=nf90_get_var(gfile_loc,i,sfc(:,:,1))
              endif
              sfc_fulldomain(:,:)=sfc(:,:,1)
           endif
@@ -1430,19 +1422,16 @@ subroutine gsi_fv3ncdf2d_read(fv3filenamegin,it,ges_z,ges_t2m,ges_q2m)
           iret=nf90_inquire_variable(gfile_loc,k,name,len)
           if(trim(name)=='PHIS'   .or. trim(name)=='phis'  ) then
              iret=nf90_inquire_variable(gfile_loc,k,ndims=ndim)
-             if(allocated(dim_id    )) deallocate(dim_id    )
-             allocate(dim_id(ndim))
              if(fv3_io_layout_y > 1) then
                 do nio=0,fv3_io_layout_y-1
-                  iret=nf90_inquire_variable(gfile_loc_layout(nio),k,dimids=dim_id)
                   if(allocated(sfc1       )) deallocate(sfc1       )
-                  allocate(sfc1(dim(dim_id(1)),dim(dim_id(2))) )
+                  allocate(sfc1(nx,ny_layout_len(nio)) )
                   iret=nf90_get_var(gfile_loc_layout(nio),k,sfc1)
                   sfc_fulldomain(:,ny_layout_b(nio):ny_layout_e(nio))=sfc1
                 enddo
              else
-                iret=nf90_inquire_variable(gfile_loc,k,dimids=dim_id)
-                allocate(sfc1(dim(dim_id(1)),dim(dim_id(2))) )
+                if(allocated(sfc1       )) deallocate(sfc1       )
+                allocate(sfc1(nx,ny) )
                 iret=nf90_get_var(gfile_loc,k,sfc1)
                 sfc_fulldomain=sfc1
              endif
