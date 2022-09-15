@@ -234,7 +234,7 @@ subroutine setupdbz(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,radardbz_d
   real(r_kind) ress,ressw
   real(r_kind) val,valqc,rwgt
   real(r_kind) cg_w,wgross,wnotgross,wgt,arg,exp_arg,term,rat_err2
-  real(r_double) rstation_id
+  real(r_double):: rstation_id=999.0_r_double
   real(r_kind) dlat,dlon,dtime,dpres,ddiff,error,slat
  
   real(r_kind) ratio_errors
@@ -255,7 +255,7 @@ subroutine setupdbz(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,radardbz_d
   integer(i_kind) istnelv,iobshgt,izz,iprvd,isprvd,iptrb
   integer(i_kind) idomsfc,iskint,isfcr,iff10
 
-  character(8) station_id
+  character(4) station_id
   character(8),allocatable,dimension(:):: cdiagbuf
   character(80):: string
   character(128):: diag_file
@@ -428,6 +428,7 @@ subroutine setupdbz(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,radardbz_d
      if (lobsdiagsave) nreal=nreal+4*miter+1
      if (.not.allocated(cdiagbuf)) allocate(cdiagbuf(nobs))
      if (.not.allocated(rdiagbuf)) allocate(rdiagbuf(nreal,nobs))
+     if(netcdf_diag) call init_netcdf_diag_
   end if
   mm1=mype+1
   scale=one
@@ -1449,9 +1450,10 @@ subroutine setupdbz(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,radardbz_d
 
 ! Release memory of local guess arrays
   call final_vars_
-
+ if(radardbz_diagsave) then
 ! Write information to diagnostic file
-  if(radardbz_diagsave  .and. ii>0 )then
+  if (netcdf_diag) call nc_diag_write
+  if(radardbz_diagsave .and.binary_diag .and. ii>0  )then
 
 ! DCD 25 May 2022:  When the following if test returns "true", reflectivity diagnostics are written to
 ! the same diag file as for the conventional observations.  However, separate conventional and reflectivity
@@ -1494,9 +1496,11 @@ subroutine setupdbz(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,radardbz_d
      close(lu_diag)
    ! end if
   end if
-  write(6,*)'mype, irefsmlobs,irejrefsmlobs are ',mype,' ',irefsmlobs, ' ',irejrefsmlobs
+ endif
+  write(6,*)'mype, end irefsmlobs,irejrefsmlobs are ',mype,' ',irefsmlobs, ' ',irejrefsmlobs
 ! close(52) !simulated obs
 ! End of routine
+
   contains
 
   subroutine check_vars_ (proceed)
@@ -1790,6 +1794,7 @@ subroutine setupdbz(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,radardbz_d
      end if
 
      call nc_diag_init(diag_conv_file, append=append_diag)
+     call flush(6)
 
      if (.not. append_diag) then ! don't write headers on append - the module will break?
         call nc_diag_header("date_time",ianldate )
@@ -1933,7 +1938,7 @@ subroutine setupdbz(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,radardbz_d
 ! Observation class
   character(7),parameter     :: obsclass = '    dbz'
   real(r_kind),dimension(miter) :: obsdiag_iuse
-           call nc_diag_metadata("Station_ID",              station_id          )
+           call nc_diag_metadata("Station_ID",              "XXXX"          )
            call nc_diag_metadata("Observation_Class",       obsclass            )
            call nc_diag_metadata("Observation_Type",        ictype(ikx)         )
            call nc_diag_metadata("Observation_Subtype",     icsubtype(ikx)      )
