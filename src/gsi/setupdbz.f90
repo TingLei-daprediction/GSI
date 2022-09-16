@@ -1938,7 +1938,7 @@ subroutine setupdbz(obsLL,odiagLL,lunin,mype,bwork,awork,nele,nobs,is,radardbz_d
 ! Observation class
   character(7),parameter     :: obsclass = '    dbz'
   real(r_kind),dimension(miter) :: obsdiag_iuse
-           call nc_diag_metadata("Station_ID",              "XXXX"          )
+           call nc_diag_metadata("Station_ID",              station_id          )
            call nc_diag_metadata("Observation_Class",       obsclass            )
            call nc_diag_metadata("Observation_Type",        ictype(ikx)         )
            call nc_diag_metadata("Observation_Subtype",     icsubtype(ikx)      )
