@@ -1162,6 +1162,7 @@ subroutine read_fv3_netcdf_guess(fv3filenamegin)
          call gsi_copy_bundle(gsibundle_fv3lam_phyvar_nouv,GSI_MetGuess_Bundle(it))
          call GSI_BundleGetPointer ( gsibundle_fv3lam_dynvar_nouv, 'tsen' ,ges_tsen_readin ,istatus );ier=ier+istatus
      !!  tsen2tv  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
          do k=1,nsig
             do j=1,lon2
                do i=1,lat2
@@ -1185,6 +1186,7 @@ subroutine read_fv3_netcdf_guess(fv3filenamegin)
            ges_ps=ges_ps_readin
            ges_ps_bg=ges_ps
            ges_prsi(:,:,nsig+1,it)=eta1_ll(nsig+1)
+!$omp parallel do schedule(dynamic,1) private(k)
            do k=1,nsig
               ges_prsi(:,:,k,it)=eta1_ll(k)+eta2_ll(k)*ges_ps
            enddo
@@ -2510,11 +2512,13 @@ subroutine gsi_fv3ncdf_readuv_v1(grd_uv,ges_u,ges_v,fv3filenamegin)
       iret=nf90_get_var(gfile_loc,var_id,us2d,start=us_startloc,count=us_countloc)
       iret=nf90_inq_varid(gfile_loc,trim(adjustl("v_w")),var_id)
       iret=nf90_get_var(gfile_loc,var_id,vw2d,start=vw_startloc,count=vw_countloc)
+!$omp parallel do schedule(dynamic) private(j)
       do j=1,ny
         uorv2d(:,j)=half*(us2d(:,j)+us2d(:,j+1))
       enddo
           
       call fv3_h_to_ll(uorv2d(:,:),hwork(1,:,:,ilevtot),nxcase,nycase,nloncase,nlatcase,grid_reverse_flag)
+!$omp parallel do schedule(dynamic) private(j)
       do j=1,nx
         uorv2d(j,:)=half*(vw2d(j,:)+vw2d(j+1,:))
       enddo
@@ -2804,6 +2808,7 @@ subroutine gsi_fv3ncdf_writeuv(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
     allocate( work_bv(nlon_regional+1,nlat_regional))
     allocate (worksub(2,grd_uv%lat2,grd_uv%lon2,grd_uv%nsig))
     allocate( work_au(nlatcase,nloncase),work_av(nlatcase,nloncase))
+!$omp parallel do schedule(dynamic) private(k,j,i)
     do k=1,grd_uv%nsig
        do j=1,grd_uv%lon2
           do i=1,grd_uv%lat2
@@ -2998,6 +3003,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
     kbgn=grd_uv%kbegin_loc
     kend=grd_uv%kend_loc
     allocate (worksub(2,grd_uv%lat2,grd_uv%lon2,grd_uv%nsig))
+!$omp parallel do schedule(dynamic) private(k,j,i)
     do k=1,grd_uv%nsig
        do j=1,grd_uv%lon2
           do i=1,grd_uv%lat2
@@ -3060,9 +3066,11 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
       call check( nf90_get_var(gfile_loc,v_wgrd_VarId,work_bv_w,start=vw_startloc,count=vw_countloc) )
 
       if(add_saved)then
+!$omp parallel do schedule(dynamic) private(j)
         do j=1,nlat_regional
           u2d(:,j)=half * (work_bu_s(:,j)+ work_bu_s(:,j+1))
         enddo
+!$omp parallel do schedule(dynamic) private(i)
         do i=1,nlon_regional
           v2d(i,:)=half*(work_bv_w(i,:)+work_bv_w(i+1,:))
         enddo
@@ -3074,6 +3082,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
         call fv3_ll_to_h(work_au(:,:),u2d,nloncase,nlatcase,nlon_regional,nlat_regional,grid_reverse_flag)
         call fv3_ll_to_h(work_av(:,:),v2d,nloncase,nlatcase,nlon_regional,nlat_regional,grid_reverse_flag)
 !!!!!!!!  add analysis_inc to readin work_b !!!!!!!!!!!!!!!!
+!$omp parallel do schedule(dynamic) private(i)
         do i=2,nlon_regional
           workbu_w2(i,:)=half*(u2d(i-1,:)+u2d(i,:))
           workbv_w2(i,:)=half*(v2d(i-1,:)+v2d(i,:))
@@ -3082,6 +3091,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
         workbv_w2(1,:)=v2d(1,:)
         workbu_w2(nlon_regional+1,:)=u2d(nlon_regional,:)
         workbv_w2(nlon_regional+1,:)=v2d(nlon_regional,:)
+!$omp parallel do schedule(dynamic) private(j)
 
         do j=2,nlat_regional
           workbu_s2(:,j)=half*(u2d(:,j-1)+u2d(:,j))
@@ -3101,6 +3111,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
       else
         call fv3_ll_to_h(work_au(:,:),u2d,nloncase,nlatcase,nlon_regional,nlat_regional,grid_reverse_flag)
         call fv3_ll_to_h(work_av(:,:),v2d,nloncase,nlatcase,nlon_regional,nlat_regional,grid_reverse_flag)
+!$omp parallel do schedule(dynamic) private(i)
 
         do i=2,nlon_regional
           work_bu_w(i,:)=half*(u2d(i-1,:)+u2d(i,:))
@@ -3110,6 +3121,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
         work_bv_w(1,:)=v2d(1,:)
         work_bu_w(nlon_regional+1,:)=u2d(nlon_regional,:)
         work_bv_w(nlon_regional+1,:)=v2d(nlon_regional,:)
+!$omp parallel do schedule(dynamic) private(j)
 
         do j=2,nlat_regional
           work_bu_s(:,j)=half*(u2d(:,j-1)+u2d(:,j))
@@ -3205,6 +3217,7 @@ subroutine gsi_fv3ncdf_write_sfc(fv3filenamegin,varname,var,add_saved)
 
     if(mype==0) then
        allocate( work_a(nlat,nlon))
+!$omp parallel do schedule(dynamic) private(i)
        do i=1,iglobal
           work_a(ltosi(i),ltosj(i))=work(i)
        end do
@@ -3603,6 +3616,7 @@ subroutine reverse_grid_r(grid,nx,ny,nz)
     real(r_kind)                      :: tmp_grid(nx,ny)
     integer(i_kind)                   :: i,j,k
 !
+!$omp parallel do schedule(dynamic) private(tmp_grid,k,j,i)
     do k=1,nz
        tmp_grid(:,:)=grid(:,:,k)
        do j=1,ny
@@ -3626,6 +3640,7 @@ subroutine reverse_grid_r_uv(grid,nx,ny,nz)
     real(r_kind)                     :: tmp_grid(nx,ny)
     integer(i_kind)                  :: i,j,k
 !
+!$omp parallel do schedule(dynamic) private(k,j,i,tmp_grid)
     do k=1,nz
        tmp_grid(:,:)=grid(:,:,k)
        do j=1,ny
@@ -3706,6 +3721,8 @@ subroutine convert_qx_to_cvpqx(qr_arr,qs_arr,qg_arr,use_cvpqx,cvpqx_pvalue)
        end if
     end if
 
+!$omp parallel do schedule(dynamic) &
+!$omp & private(k,j,i,qr_min,qr_thrshd,qs_min,qs_thrshd,qg_min,qg_thrshd)
     do k=1,nsig
       do i=1,lon2
         do j=1,lat2
@@ -3806,6 +3823,7 @@ subroutine convert_nx_to_cvpnx(qnx_arr,cvpnr,cvpnr_pvalue)
        write(6,*)'read_fv3_netcdf_guess: convert qnx with power transform .'
     end if
 
+!$omp parallel do schedule(dynamic) private(k,j,i)
     do k=1,nsig
       do i=1,lon2
         do j=1,lat2
@@ -3896,6 +3914,9 @@ subroutine convert_cvpqx_to_qx(qr_arr,qs_arr,qg_arr,use_cvpqx,cvpqx_pvalue)
     tmparr_qs =qs_arr
     tmparr_qg =qg_arr
 
+!$omp parallel do schedule(dynamic) &
+!$omp & private(k,j,i,qr_tmp,qs_tmp,qg_tmp,qr_min,qr_thrshd, &
+!$omp & qs_min,qs_thrshd,qg_min,qg_thrshd )
     do k=1,nsig
       do i=1,lon2
         do j=1,lat2
