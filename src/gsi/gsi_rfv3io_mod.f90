@@ -3616,7 +3616,7 @@ subroutine reverse_grid_r(grid,nx,ny,nz)
     real(r_kind)                      :: tmp_grid(nx,ny)
     integer(i_kind)                   :: i,j,k
 !
-!$omp parallel do schedule(dynamic) private(tmp_grid,k,j,i) !cltthink
+!$omp parallel do schedule(dynamic) private(tmp_grid,k,j,i)
     do k=1,nz
        tmp_grid(:,:)=grid(:,:,k)
        do j=1,ny
