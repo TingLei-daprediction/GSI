@@ -193,8 +193,20 @@ subroutine generate_anl_grid(nx,ny,grid_lon,grid_lont,grid_lat,grid_latt)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 !--------------------------obtain analysis grid dimensions nxa,nya
-  nxa=1+nint((nx-one)/grid_ratio_fv3_regional)
-  nya=1+nint((ny-one)/grid_ratio_fv3_regional)
+  if (multigrid_betafct /= .true.) then 
+    nxa=1+nint((nx-one)/grid_ratio_fv3_regional)
+    nya=1+nint((ny-one)/grid_ratio_fv3_regional)
+  else
+    n_mgbf_levs=4
+    n_mgbf_factor=2**n_mgbf_levs
+!find the maximum numbers of n_mgbf_actor smaller than nxa/nya respectively
+    nxtemp1=1+nint((nx-one)/grid_ratio_fv3_regional)
+    nytemp1=1+nint((ny-one)/grid_ratio_fv3_regional)
+    nxa=nxtemp1/n_mgbf_factor*n_mgbf_factor
+    nya=nytemp1/n_mgbf_factor*n_mgbf_factor
+    if(mype==0) print *,'mgbf: original and coverted nlat,nlon=nya,nxa= ',nxtem1,nytem1,nlat,nlon
+    
+  endif
   nlat=nya
   nlon=nxa
   if(mype==0) print *,'nlat,nlon=nya,nxa= ',nlat,nlon
