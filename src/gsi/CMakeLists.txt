@@ -110,6 +110,7 @@ if(GSI_MODE MATCHES "GFS") # GFS GSI application
 elseif(GSI_MODE MATCHES "Regional") # Regional GSI application
   list(APPEND GSI_SRC_Fortran
     ${GSI_SRC_regional_cplr}
+    ${GSI_SRC_MGBF}
     ${GSI_SRC_fixture_regional})
 endif()
 

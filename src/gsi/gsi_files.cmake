@@ -49,6 +49,9 @@ cplr_wrwrfmassa.f90
 cplr_wrwrfnmma.f90
 )
 
+list(APPEND GSI_SRC_MGBF 
+     pre_multigrid.f90
+     )
 list(APPEND GSI_SRC_main
 gsimain.f90
 gsimod.F90

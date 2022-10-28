@@ -116,6 +116,7 @@ subroutine generate_anl_grid(nx,ny,grid_lon,grid_lont,grid_lat,grid_latt)
   use gridmod,  only:init_general_transform,region_dy,region_dx 
   use mpimod, only: mype
   use egrid2agrid_mod, only: egrid2agrid_parm
+  use mpimod, only: nxpe, nype
   implicit none
 
   real(r_kind),allocatable,dimension(:)::xbh_a,xa_a,xa_b
@@ -149,6 +150,9 @@ subroutine generate_anl_grid(nx,ny,grid_lon,grid_lont,grid_lat,grid_latt)
   real(r_kind) diff,sq180
   real(r_kind) d(4),ds
   integer(i_kind) kk,k
+  integer(i_kind) n1,nxtemp1,nytemp1,nfactor
+  integer(i_kind) n_mgbf_levs
+  logical :: multigrid_betafct=.false. ! for temperary use
 
 
   nord_e2a=4
@@ -198,15 +202,27 @@ subroutine generate_anl_grid(nx,ny,grid_lon,grid_lont,grid_lat,grid_latt)
     nya=1+nint((ny-one)/grid_ratio_fv3_regional)
   else
     n_mgbf_levs=4
-    n_mgbf_factor=2**n_mgbf_levs
+    nfactor=2**n_mgbf_levs
+    
 !find the maximum numbers of n_mgbf_actor smaller than nxa/nya respectively
     nxtemp1=1+nint((nx-one)/grid_ratio_fv3_regional)
     nytemp1=1+nint((ny-one)/grid_ratio_fv3_regional)
-    nxa=nxtemp1/n_mgbf_factor*n_mgbf_factor
-    nya=nytemp1/n_mgbf_factor*n_mgbf_factor
-    if(mype==0) print *,'mgbf: original and coverted nlat,nlon=nya,nxa= ',nxtem1,nytem1,nlat,nlon
+    n1=nxtemp1/nfactor/nxpe
+    if (n1 > 0) then
+      nxa=n1*nxpe*nfactor
+    else
+     write(6,*) " problem ..."
+    endif
+    n1=nytemp1/nfactor/nype
+    if (n1 > 0) then
+      nya=n1*nype*nfactor
+    else
+     write(6,*) " problem ..."
+    endif
+  endif  
+   
+  if(mype==0) print *,'mgbf: original and coverted nlat,nlon=nya,nxa= ',nxtemp1,nytemp1,nlat,nlon
     
-  endif
   nlat=nya
   nlon=nxa
   if(mype==0) print *,'nlat,nlon=nya,nxa= ',nlat,nlon

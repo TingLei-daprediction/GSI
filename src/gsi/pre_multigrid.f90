@@ -213,6 +213,7 @@ subroutine mk_transf_fields(cvec,iflg)
   use constants, only: zero
   use gsi_bundlemod, only : gsi_bundle
   use gridmod, only: nsig,lat2,lon2,nlat,nlon
+   use gridmod, only: grd_a
   use gridmod, only: strip,istart,jstart
   use mpimod, only: mype,ierror,mpi_rtype,mpi_sum,mpi_comm_world
   use gsi_bundlemod, only: gsi_bundlegetpointer
@@ -226,6 +227,7 @@ subroutine mk_transf_fields(cvec,iflg)
   integer(i_kind) i,j,k,n,kk,mm1,istatus,iglob,jglob
   real(r_kind),pointer,dimension(:,:,:)::ptr3d=>NULL()
   real(r_kind),pointer,dimension(:,:)  ::ptr2d=>NULL()
+  real(r_kind):: hwork(1,grd_a%nlat,grd_a%nlon,grd_a%kbegin_loc:grd_a%kend_alloc)
 
   mm1=mype+1
 
@@ -277,6 +279,13 @@ subroutine mk_transf_fields(cvec,iflg)
            end do
         end do
      end do
+!clt the following sub2grid and grid2sub are to 
+!clt to make use of the update of halo points in generaal_grid2sub 
+!clt it is , of course, not an efficient way when such global communiation
+!clt is applied. M. Rannic would implement more efficient inner-neighbour halo
+!updating approach in the future. 
+    call general_sub2grid(grd_a,cvec%values,hwork)
+    call general_grid2sub(grd_a,hwork,cvec%values)
 
   end if
 
