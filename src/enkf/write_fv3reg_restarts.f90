@@ -51,12 +51,33 @@
        character(len=*), intent(in) :: filename
        integer(i_kind), intent(in) :: file_id
        integer(i_kind) :: var_id
-       data_arr=data_arr(:,:, &
-                          ubound(data_arr,3):lbound(data_arr,3):-1)
+       integer(i_kind)::i,j,k,it
+       real(r_single), allocatable, dimension(:,:,:) :: data_tmp
+       integer(i_kind):: ilow,iup, jlow,jup,klow,kup,klev
+       ilow=lbound(data_arr,1)
+       iup=ubound(data_arr,1)
+       jlow=lbound(data_arr,2)
+       jup=ubound(data_arr,2)
+       klow=lbound(data_arr,3)
+       kup=ubound(data_arr,3)
+      allocate(data_tmp(ilow:iup,jlow:jup,klow:kup))
+!$omp parallel do schedule(dynamic,1) private(k,j,i,klev)
+       do k=klow, kup
+          klev=kup-k+klow
+          do j=jlow, jup
+            do i=ilow, iup
+             data_tmp(i,j,klev)=data_arr(i,j,k)
+            enddo
+         enddo
+       enddo 
+       
+!clt       data_arr=data_arr(:,:, &
+!clt                          ubound(data_arr,3):lbound(data_arr,3):-1)
        call nc_check( nf90_inq_varid(file_id,trim(adjustl(varname)),var_id),&
        myname_,'inq_varid '//trim(adjustl(varname))//' '//trim(filename) )
-       call nc_check( nf90_put_var(file_id,var_id,data_arr),&
+       call nc_check( nf90_put_var(file_id,var_id,data_tmp),&
        myname_,'get_var '//trim(adjustl(varname))//' '//trim(filename) )
+       deallocate(data_tmp)
     end subroutine write_fv3_restart_data3d
 
     subroutine write_fv3_restart_data4d(varname,filename,file_id,data_arr)
@@ -66,13 +87,37 @@
        character(len=*), intent(in) :: filename
        integer(i_kind), intent(in) :: file_id
        integer(i_kind) :: var_id
-       data_arr=data_arr(:,:, &
-                          ubound(data_arr,3):lbound(data_arr,3):-1,lbound(data_arr,4):ubound(data_arr,4))
-!Notice, the 4th dimension is not reversed
+       integer(i_kind) :: i,j,k,it
+       real(r_single), allocatable, dimension(:,:,:,:) :: data_tmp
+       integer(i_kind):: ilow,iup, jlow,jup,klow,kup,tlow,tup,klev
+       ilow=lbound(data_arr,1)
+       iup=ubound(data_arr,1)
+       jlow=lbound(data_arr,2)
+       jup=ubound(data_arr,2)
+       klow=lbound(data_arr,3)
+       kup=ubound(data_arr,3)
+       tlow=lbound(data_arr,4)
+       tup=ubound(data_arr,4)
+       allocate(data_tmp(ilow:iup,jlow:jup,klow:kup,tlow:tup))
+       do it=tlow, tup
+        do k=klow, kup
+          klev=kup-k+klow
+          do j=jlow, jup
+            do i=ilow, iup
+             data_tmp(i,j,klev,it)=data_arr(i,j,k,it)
+            enddo
+         enddo
+        enddo 
+       enddo 
+!clt       data_arr=data_arr(:,:, &
+!clt                          ubound(data_arr,3):lbound(data_arr,3):-1,lbound(data_arr,4):ubound(data_arr,4))
+!Notice, the 4th dimension is not reversed,sure, it should not be reversed, the
+!inconsitency in read part has been fixed
        call nc_check( nf90_inq_varid(file_id,trim(adjustl(varname)),var_id),&
        myname_,'inq_varid '//trim(adjustl(varname))//' '//trim(filename) )
-       call nc_check( nf90_put_var(file_id,var_id,data_arr),&
+       call nc_check( nf90_put_var(file_id,var_id,data_tmp),&
        myname_,'get_var '//trim(adjustl(varname))//' '//trim(filename) )
+       deallocate(data_tmp)
     end subroutine write_fv3_restart_data4d
 
     end module write_fv3regional_restarts
