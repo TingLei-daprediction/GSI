@@ -1067,7 +1067,10 @@ subroutine read_fv3_netcdf_guess(fv3filenamegin)
           call stop2(333)
       endif
       if(mype == 0) then
-        write(6,*) ' fv3lam_io_dynmetvars3d_nouv is ',(trim(fv3lam_io_dynmetvars3d_nouv(i)),i=1,ndynvario3d)
+        write(6,*)'thinkdeb ndyvarios3d is ',ndynvario3d
+        do i=1,ndynvario3d
+        write(6,*) ' fv3lam_io_dynmetvars3d_nouv is ',trim(fv3lam_io_dynmetvars3d_nouv(i))
+        enddo
         write(6,*) ' fv3lam_io_tracermevars3d_nouv is ',(trim(fv3lam_io_tracermetvars3d_nouv(i)),i=1,ntracerio3d)
         write(6,*) ' fv3lam_io_phymetvars3d_nouv is ',(trim(fv3lam_io_phymetvars3d_nouv(i)),i=1,nphyvario3d)
       endif
@@ -1436,6 +1439,7 @@ subroutine read_fv3_netcdf_guess(fv3filenamegin)
            if (ier/=0) call die(trim(myname),'cannot get pointers for fv3lam_tracerchem_nouv, ier =',ier)
 
          ! Compute background amassi, amassj, amassk and pm2_5   
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
            do k=1,nsig
              do j=1,lon2
                do i=1,lat2
@@ -1481,6 +1485,7 @@ subroutine read_fv3_netcdf_guess(fv3filenamegin)
            call GSI_BundleGetPointer ( gsibundle_fv3lam_tracersmoke_nouv,'pm2_5',ges_pm2_5,istatus );ier=ier+istatus
            if (ier/=0) call die(trim(myname),'cannot get pointers for fv3 chem-fields, ier =',ier)
            ! Calculate  pm2_5
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
              do k=1,nsig
                do j=1,lon2
                  do i=1,lat2
@@ -1506,6 +1511,7 @@ subroutine read_fv3_netcdf_guess(fv3filenamegin)
          if(if_model_dbz) call gsi_copy_bundle(gsibundle_fv3lam_phyvar_nouv,GSI_MetGuess_Bundle(it))
          call GSI_BundleGetPointer ( gsibundle_fv3lam_dynvar_nouv, 'tsen' ,ges_tsen_readin ,istatus );ier=ier+istatus
      !!  tsen2tv  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
          do k=1,nsig
             do j=1,lon2
                do i=1,lat2
@@ -2425,6 +2431,7 @@ subroutine gsi_fv3ncdf_read_v1(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin)
         call flush(6)
         call stop2(333)
       endif
+      write(6,*)'thinkdebin read_3d_v1, vgsinnam is',trim(vgsiname),trim(varname)
       ilev=grd_ionouv%lnames(1,ilevtot)
       nz=grd_ionouv%nsig
       nzp1=nz+1
@@ -2432,6 +2439,7 @@ subroutine gsi_fv3ncdf_read_v1(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin)
       startloc=(/1,1,inative+1/)
       countloc=(/nxcase,nycase,1/)
       iret=nf90_inq_varid(gfile_loc,trim(adjustl(varname)),var_id)
+      write(6,*)'thinkdebvarname in read_v1',trim(varname),' ',iret
       if(iret/=nf90_noerr) then
         write(6,*)' wrong to get var_id ',var_id
         call stop2(333)
@@ -3596,6 +3604,7 @@ subroutine gsi_fv3ncdf_writeuv(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
     allocate( work_bv(nlon_regional+1,nlat_regional))
     allocate (worksub(2,grd_uv%lat2,grd_uv%lon2,grd_uv%nsig))
     allocate( work_au(nlatcase,nloncase),work_av(nlatcase,nloncase))
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
     do k=1,grd_uv%nsig
        do j=1,grd_uv%lon2
           do i=1,grd_uv%lat2
@@ -3790,6 +3799,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
     kbgn=grd_uv%kbegin_loc
     kend=grd_uv%kend_loc
     allocate (worksub(2,grd_uv%lat2,grd_uv%lon2,grd_uv%nsig))
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
     do k=1,grd_uv%nsig
        do j=1,grd_uv%lon2
           do i=1,grd_uv%lat2
@@ -4917,6 +4927,7 @@ subroutine convert_cvpnx_to_nx(qnx_arr,cvpnr,cvpnr_pvalue,cloud_nt_updt,q_arr,qr
 end subroutine convert_cvpnx_to_nx
 subroutine gsi_copy_bundle(bundi,bundo) 
     use gsi_bundlemod, only:gsi_bundleinquire, gsi_bundlegetpointer,gsi_bundleputvar
+    use mpimod, only:mype
     implicit none  
      
  !  copy the variables in the gsi_metguess_bundle_inout to gsi_bundle_inout or
@@ -4934,7 +4945,7 @@ subroutine gsi_copy_bundle(bundi,bundo)
     character(len=max_varname_length),dimension(:),allocatable:: target_name_vars3d
     character(len=max_varname_length) ::varname 
     real(r_kind),dimension(:,:,:),pointer:: pvar3d=>NULL()
-    real(r_kind),dimension(:,:,:),pointer:: pvar2d =>NULL()
+    real(r_kind),dimension(:,:),pointer:: pvar2d =>NULL()
     integer(i_kind):: src_nc3d,src_nc2d,target_nc3d,target_nc2d
     integer(i_kind):: ivar,jvar,istatus
     src_nc3d=bundi%n3d
@@ -4947,6 +4958,20 @@ subroutine gsi_copy_bundle(bundi,bundo)
     call gsi_bundleinquire(bundi,'shortnames::2d',src_name_vars2d,istatus)
     call gsi_bundleinquire(bundo,'shortnames::3d',target_name_vars3d,istatus)
     call gsi_bundleinquire(bundo,'shortnames::2d',target_name_vars2d,istatus)
+  if(mype==0) then
+    do ivar=1,src_nc3d
+       write(6,*)'thinkdeb src3dname is ',trim(src_name_vars3d(ivar))
+    enddo 
+    do ivar=1,src_nc2d
+       write(6,*)'thinkdeb src2dname is ',trim(src_name_vars2d(ivar))
+    enddo
+    do ivar=1,target_nc3d
+       write(6,*)'thinkdeb target3dname is ',trim(target_name_vars3d(ivar))
+    enddo 
+    do ivar=1,target_nc2d
+       write(6,*)'thinkdeb target2dname is ',trim(target_name_vars2d(ivar))
+    enddo
+  endif
     do ivar=1,src_nc3d
       varname=trim(src_name_vars3d(ivar))
       do jvar=1,target_nc3d
@@ -4961,7 +4986,11 @@ subroutine gsi_copy_bundle(bundi,bundo)
       varname=trim(src_name_vars2d(ivar))
       do jvar=1,target_nc2d
         if(index(target_name_vars2d(jvar),varname) > 0)  then
+           write(6,*)'thinkdeb varname is ',trim(varname)
+!clt           tothink
           call GSI_BundleGetPointer (bundi,varname,pvar2d,istatus)
+           write(6,*)'thinkdeb istatus is ',istatus
+           call flush(6)
           call gsi_bundleputvar (bundo,varname,pvar2d,istatus)
           exit
         endif

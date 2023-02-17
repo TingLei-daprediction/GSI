@@ -454,6 +454,7 @@ contains
  
                  case('sf','SF')
     
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
                           do j=1,grd_ens%lat2
@@ -465,6 +466,7 @@ contains
  
                  case('vp','VP')
  
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
                           do j=1,grd_ens%lat2
@@ -476,6 +478,7 @@ contains
  
                  case('t','T')
  
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
                           do j=1,grd_ens%lat2
@@ -487,6 +490,7 @@ contains
  
                  case('q','Q')
  
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
                           do j=1,grd_ens%lat2
@@ -498,6 +502,7 @@ contains
  
                  case('oz','OZ')
  
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
                           do j=1,grd_ens%lat2
@@ -511,6 +516,7 @@ contains
 
                  case('ql','QL')
 
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
                           do j=1,grd_ens%lat2
@@ -522,6 +528,7 @@ contains
 
                  case('qi','QI')
 
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
                           do j=1,grd_ens%lat2
@@ -532,6 +539,7 @@ contains
                     end do
 
                  case('qr','QR')
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
 
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
@@ -544,6 +552,7 @@ contains
 
                  case('qs','QS')
 
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
                           do j=1,grd_ens%lat2
@@ -555,6 +564,7 @@ contains
 
                  case('qg','QG')
 
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
                           do j=1,grd_ens%lat2
@@ -566,6 +576,7 @@ contains
 
                  case('qnr','QNR')
 
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                       do k=1,grd_ens%nsig
                          do i=1,grd_ens%lon2
                             do j=1,grd_ens%lat2
@@ -583,6 +594,7 @@ contains
                       end do
 
                  case('w','W')
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
                           do j=1,grd_ens%lat2
@@ -593,6 +605,7 @@ contains
                     end do
 
                  case('dbz','DBZ')
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
                     do k=1,grd_ens%nsig
                        do i=1,grd_ens%lon2
                           do j=1,grd_ens%lat2
@@ -624,6 +637,7 @@ contains
  
                  case('ps','PS')
  
+!$omp parallel do schedule(dynamic,1) private(j,i)
                     do i=1,grd_ens%lon2
                        do j=1,grd_ens%lat2
                           w2(j,i) = ps(j,i)
@@ -634,6 +648,7 @@ contains
                  case('sst','SST')
  ! IGNORE SST IN HYBRID for now
  
+!$omp parallel do schedule(dynamic,1) private(j,i)
                     do i=1,grd_ens%lon2
                        do j=1,grd_ens%lat2
                           w2(j,i) = zero
@@ -660,6 +675,7 @@ contains
                  write(6,*)' error retrieving pointer to ',trim(cvars2d(ic2)),' for en_bar to get ps_bar'
                  call stop2(9996)
               end if
+!$omp parallel do schedule(dynamic,1) private(j,i)
   
               do i=1,grd_ens%lon2
                  do j=1,grd_ens%lat2
@@ -677,6 +693,7 @@ contains
         sig_norm=sqrt(one/max(one,n_ens_fv3sar-one))
  
         do n=imem_start,n_ens
+!$omp parallel do schedule(dynamic,1) private(i)
            do i=1,nelen
               en_perts(n,1,m)%valuesr4(i)=(en_perts(n,1,m)%valuesr4(i)-en_bar(m)%values(i))*sig_norm
            end do
@@ -903,6 +920,7 @@ contains
     endif
      
 !!  tsen2tv  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
     do k=1,grd_ens%nsig
        do j=1,grd_ens%lon2
           do i=1,grd_ens%lat2
@@ -913,6 +931,7 @@ contains
     if (.not.q_hyb_ens) then
       ice=.true.
       iderivative=0
+!$omp parallel do schedule(dynamic,1) private(k,j,i,kp)
       do k=1,grd_ens%nsig
         kp=k+1
         do j=1,grd_ens%lon2
@@ -922,6 +941,7 @@ contains
         end do
       end do
       call genqsat(g_rh,g_tsen(1,1,1),g_prsl(1,1,1),grd_ens%lat2,grd_ens%lon2,grd_ens%nsig,ice,iderivative)
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
       do k=1,grd_ens%nsig
         do j=1,grd_ens%lon2
           do i=1,grd_ens%lat2
@@ -930,6 +950,7 @@ contains
         end do
       end do
     else
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
         do k=1,grd_ens%nsig
           do j=1,grd_ens%lon2
             do i=1,grd_ens%lat2
@@ -1131,6 +1152,7 @@ contains
        endif
         
    !!  tsen2tv  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
        do k=1,grd_ens%nsig
           do j=1,grd_ens%nlon
              do i=1,grd_ens%nlat
@@ -1141,6 +1163,7 @@ contains
        if (.not.q_hyb_ens) then
          ice=.true.
          iderivative=0
+!$omp parallel do schedule(dynamic,1) private(k,kp,j,i)
          do k=1,grd_ens%nsig
            kp=k+1
            do j=1,grd_ens%nlon
@@ -1150,6 +1173,7 @@ contains
            end do
          end do
          call genqsat(g_rh,g_tsen(1,1,1),g_prsl(1,1,1),grd_ens%nlat,grd_ens%nlon,grd_ens%nsig,ice,iderivative)
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
          do k=1,grd_ens%nsig
            do j=1,grd_ens%nlon
              do i=1,grd_ens%nlat
@@ -1158,6 +1182,7 @@ contains
            end do
          end do
        else
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
            do k=1,grd_ens%nsig
              do j=1,grd_ens%nlon
                do i=1,grd_ens%nlat

@@ -42,6 +42,7 @@ subroutine write_all(increment)
   use mpeu_util, only: die
 
   use control_vectors, only: control_vector
+  use mpi, only: mpi_wtime
 
   implicit none
 
@@ -113,6 +114,7 @@ subroutine write_all(increment)
   integer(i_kind) mype_atm,mype_bias,mype_sfc,iret_bias,ier
   real(r_kind),dimension(:,:),pointer::ges_z=>NULL()
   type(regional_io_class) :: io 
+  real(r_kind):: t1,t2
 
 #ifndef HAVE_ESMF
 !********************************************************************
@@ -121,7 +123,10 @@ subroutine write_all(increment)
 ! Regional output
   if (regional) then
      if (fv3_regional) then
+        t1=mpi_wtime()
         call wrfv3_netcdf(bg_fv3regfilenameg(ntguessig))
+        t2=mpi_wtime()
+        write(6,*)'think time writing fv3 is ',t2-t1
      else
         call io%write_regional_analysis(mype)
      endif

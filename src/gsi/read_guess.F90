@@ -120,6 +120,7 @@ subroutine read_guess(iyear,month,idd,mype)
 
   use gsi_rfv3io_mod, only: bg_fv3regfilenameg
   use mpimod, only: mpi_comm_world
+  use mpi, only: mpi_wtime
 
   implicit none
 
@@ -142,6 +143,7 @@ subroutine read_guess(iyear,month,idd,mype)
   real(r_kind),dimension(:,:,:),allocatable:: work
   real(r_kind),dimension(:,:,:),pointer:: ges_tv=>NULL()
   real(r_kind),dimension(:,:,:),pointer:: ges_q =>NULL()
+  real(r_kind):: t1,t2
 
   iret_bias=0
 !-----------------------------------------------------------------------------------
@@ -170,11 +172,17 @@ subroutine read_guess(iyear,month,idd,mype)
         else if (nems_nmmb_regional) then
            call nmm_binary_guess%read_nems_nmmb_guess(mype)
         else if (fv3_regional      ) then
+                t1=mpi_wtime()
            allocate(bg_fv3regfilenameg(nfldsig))
+
+          
            do it=1,nfldsig   
               call bg_fv3regfilenameg(it)%init(it)
            end do
+           
            call read_fv3_netcdf_guess(bg_fv3regfilenameg)
+           t2=mpi_wtime()
+           write(6,*)'thinkdeb t reading background is ',t2-t1
         else if (cmaq_regional) then
            call read_cmaq_guess(mype)
         end if

@@ -207,7 +207,6 @@ contains
              varstrname = 'u'
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,uworkvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
                  nn = nn_tile0
                  do j=1,ny_res
@@ -230,7 +229,6 @@ contains
              varstrname = 'v'
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,vworkvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
                nn = nn_tile0
                do j=1,ny_res
@@ -252,13 +250,11 @@ contains
               varstrname = 'W'
               call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
               call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
               do k=1,nlevs
- !clt non-openmp                nn = nn_tile0
+                 nn = nn_tile0
                  do j=1,ny_res
                    do i=1,nx_res
-   !clt non-openmp                  nn=nn+1
-                      nn=nn_tile0+(j-1)*nx_res+i
+                      nn=nn+1
                       vargrid(nn,levels(w_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                    enddo
                  enddo
@@ -283,13 +279,11 @@ contains
 
               if (q_ind > 0) then
                   varstrname = 'sphum'
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                   do k=1,nlevs
- !clt                    nn = nn_tile0
+                     nn = nn_tile0
                      do j=1,ny_res
                         do i=1,nx_res
- !clt non-openmp                          nn=nn+1
-                      nn=nn_tile0+(j-1)*nx_res+i
+                           nn=nn+1
                            vargrid(nn,levels(q_ind-1)+k,nb,ne)=qworkvar3d(i,j,k) 
                          enddo
                       enddo
@@ -302,7 +296,6 @@ contains
 
               endif
               if(tv_ind > 0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
                  do k=1,nlevs
                    do j=1,ny_res
                       do i=1,nx_res
@@ -310,32 +303,16 @@ contains
                       enddo
                     enddo
                   enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                 do k=1,nlevs
-                   do j=1,ny_res
-                      do i=1,nx_res
-                         tvworkvar3d=workvar3d
-                      enddo
-                   enddo
-                 enddo
+                  tvworkvar3d=workvar3d
               else! tsen_id >0
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                 do k=1,nlevs
-                   do j=1,ny_res
-                      do i=1,nx_res
-                        workvar3d=tsenworkvar3d
-                      enddo
-                    enddo
-                  enddo
+                 workvar3d=tsenworkvar3d
               endif
               tmp_ind=max(tv_ind,tsen_ind) !then can't be both >0 
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
               do k=1,nlevs
-!clt non-omp                 nn = nn_tile0
+                 nn = nn_tile0
                  do j=1,ny_res
                    do i=1,nx_res
-!clt non-omp                      nn=nn+1
-                      nn=nn_tile0+(j-1)*nx_res+i
+                      nn=nn+1
                       vargrid(nn,levels(tmp_ind-1)+k,nb,ne)=workvar3d(i,j,k) 
                    enddo
                  enddo
@@ -356,13 +333,11 @@ contains
               varstrname = 'o3mr'
               call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
               call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
               do k=1,nlevs
-!clt non-omp                  nn = nn_tile0
+                  nn = nn_tile0
                   do j=1,ny_res
                     do i=1,nx_res
-!clt non-omp                       nn=nn+1
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        vargrid(nn,levels(oz_ind-1)+k,nb,ne)=workvar3d(i,j,k) 
                     enddo
                   enddo
@@ -379,13 +354,11 @@ contains
                varstrname = 'liq_wat'
                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
                call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                do k=1,nlevs
-!clt non-omp                  nn = nn_tile0
+                  nn = nn_tile0
                   do j=1,ny_res
                     do i=1,nx_res
-!clt non-omp                       nn=nn+1
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        vargrid(nn,levels(ql_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                     enddo
                   enddo
@@ -402,11 +375,11 @@ contains
                varstrname = 'ice_wat'
                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
                call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                do k=1,nlevs
+                  nn = nn_tile0
                   do j=1,ny_res
                     do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        vargrid(nn,levels(qi_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                     enddo
                   enddo
@@ -423,11 +396,11 @@ contains
                varstrname = 'rainwat'
                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
                call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                do k=1,nlevs
+                  nn = nn_tile0
                   do j=1,ny_res
                     do i=1,nx_res
-                      nn=nn_tile0+(j-1)*nx_res+i
+                      nn=nn+1
                       vargrid(nn,levels(qr_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                     enddo
                  enddo
@@ -444,11 +417,11 @@ contains
                varstrname = 'snowwat'
                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
                call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                do k=1,nlevs
+                  nn = nn_tile0
                   do j=1,ny_res
                     do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        vargrid(nn,levels(qs_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                     enddo
                   enddo
@@ -465,11 +438,11 @@ contains
                varstrname = 'graupel'
                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
                call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                do k=1,nlevs
+                  nn = nn_tile0
                   do j=1,ny_res
                     do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        vargrid(nn,levels(qg_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                     enddo
                   enddo
@@ -486,11 +459,11 @@ contains
                varstrname = 'rain_nc'
                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
                call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                do k=1,nlevs
+                   nn = nn_tile0
                    do j=1,ny_res
                      do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        vargrid(nn,levels(qnr_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                      enddo
                    enddo
@@ -505,14 +478,7 @@ contains
            
             ! set SST to zero for now
            if (sst_ind > 0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
-                do j=1,ny_res
-                   do i=1,nx_res
-                     nn=nn_tile0+(j-1)*nx_res+i
-                     vargrid(nn,levels(n3d)+sst_ind,nb,ne)= zero 
-                   enddo
-               enddo
-!cltorg               vargrid(:,levels(n3d)+sst_ind,nb,ne) = zero
+               vargrid(:,levels(n3d)+sst_ind,nb,ne) = zero
            endif
 
 
@@ -534,11 +500,9 @@ contains
 
 
               nn = nn_tile0
-!$omp parallel do schedule(dynamic,1) private(j,i,nn)
               do j=1,ny_res
                  do i=1,nx_res
-!clt non-omp                    nn=nn+1
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     vargrid(nn,levels(n3d)+ps_ind, nb,ne) =pswork(i,j) 
                  enddo
               enddo
@@ -546,6 +510,7 @@ contains
               
               
 
+              
               do k=1,nlevs
                 do j=1,ny_res  
                  do i=1,nx_res
@@ -560,11 +525,11 @@ contains
               else
                 qsatworkvar3d(:,:,:) = 1._r_double
               endif
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
               do k=1,nlevs
+                 nn = nn_tile0
                  do j=1,ny_res
                    do i=1,nx_res
-                      nn=nn_tile0+(j-1)*nx_res+i
+                      nn=nn+1
                       qsat(nn,k,nb,ne)=qsatworkvar3d(i,j,k) 
                    enddo
                  enddo
@@ -748,11 +713,11 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
                
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,uworkvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
+                nn = nn_tile0
                 do j=1,ny_res
                    do i=1,nx_res
-                     nn=nn_tile0+(j-1)*nx_res+i
+                     nn=nn+1
                      workinc3d(i,j,k)=vargrid(nn,levels(u_ind-1)+k,nb,ne) 
                    enddo
                 enddo
@@ -770,11 +735,11 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
                
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,vworkvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
+                nn = nn_tile0
                 do j=1,ny_res
                   do i=1,nx_res
-                     nn=nn_tile0+(j-1)*nx_res+i
+                     nn=nn+1
                      workinc3d(i,j,k)=vargrid(nn,levels(v_ind-1)+k,nb,ne) 
                   enddo
                 enddo
@@ -791,11 +756,11 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
 
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
+                nn = nn_tile0
                 do j=1,ny_res
                   do i=1,nx_res
-                     nn=nn_tile0+(j-1)*nx_res+i
+                     nn=nn+1
                      workinc3d(i,j,k)=vargrid(nn,levels(w_ind-1)+k,nb,ne)
                   enddo
                 enddo
@@ -809,33 +774,25 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
                
             varstrname = 'T'
             if(tsen_ind>0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
               do k=1,nlevs
+                nn = nn_tile0
                 do j=1,ny_res
                   do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     workinc3d(i,j,k)=vargrid(nn,levels(tsen_ind-1)+k,nb,ne) 
                   enddo
                 enddo
               enddo
               call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
               call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
-              do k=1,nlevs
-                do j=1,ny_res
-                   do i=1,nx_res
-                     nn=nn_tile0+(j-1)*nx_res+i
-                     workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                   enddo
-                 enddo
-              enddo
+              workvar3d=workvar3d+workinc3d
               call write_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
             else  ! tv_ind >0  
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
               do k=1,nlevs
+                  nn = nn_tile0
                   do j=1,ny_res
                     do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        workinc3d(i,j,k)=vargrid(nn,levels(tv_ind-1)+k,nb,ne) 
                     enddo
                   enddo
@@ -848,43 +805,21 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
               varstrname = 'sphum'
               call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
               call read_fv3_restart_data3d(varstrname,fv3filename,file_id,qworkvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                 do k=1,nlevs
-                   do j=1,ny_res
-                      do i=1,nx_res
-                        tvworkvar3d(i,j,k)=tsenworkvar3d(i,j,k)*(one+fv*qworkvar3d(i,j,k))
-                      enddo
-                    enddo
-                  enddo
-!clt             tvworkvar3d=tvworkvar3d+workinc3d
+              tvworkvar3d=tsenworkvar3d*(one+fv*qworkvar3d)
+              tvworkvar3d=tvworkvar3d+workinc3d
               if(q_ind > 0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                 do k=1,nlevs
+                   nn = nn_tile0
                    do j=1,ny_res
                      do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        workinc3d(i,j,k)=vargrid(nn,levels(q_ind-1)+k,nb,ne) 
                      enddo
                    enddo
                  enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                 do k=1,nlevs
-                   do j=1,ny_res
-                      do i=1,nx_res
-                        qworkvar3d(i,j,k)=qworkvar3d(i,j,k)+workinc3d(i,j,k)  
-                     enddo
-                   enddo
-                 enddo
+                 qworkvar3d=qworkvar3d+workinc3d   
               endif
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-              do k=1,nlevs
-                 do j=1,ny_res
-                    do i=1,nx_res
-!cltorg              tsenworkvar3d=tvworkvar3d/(one+fv*qworkvar3d)
-                       tsenworkvar3d(i,j,k)=tvworkvar3d(i,j,k)/(one+fv*qworkvar3d(i,j,k))
-                     enddo
-                  enddo
-               enddo
+              tsenworkvar3d=tvworkvar3d/(one+fv*qworkvar3d)
               varstrname = 'T'
               call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
               call write_fv3_restart_data3d(varstrname,fv3filename,file_id,tsenworkvar3d)
@@ -921,23 +856,16 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
                
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
+               nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     workinc3d(i,j,k)=vargrid(nn,levels(oz_ind-1)+k,nb,ne) 
                  enddo
                enddo
              enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-             do k=1,nlevs
-                do j=1,ny_res
-                   do i=1,nx_res
-                      workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                   enddo
-                 enddo
-             enddo
+             workvar3d=workvar3d+workinc3d
              call write_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
 
           endif
@@ -946,23 +874,16 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
              varstrname = 'liq_wat'
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
+                nn = nn_tile0
                 do j=1,ny_res
                   do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     workinc3d(i,j,k)=vargrid(nn,levels(ql_ind-1)+k,nb,ne)
                   enddo
                 enddo
              enddo
-             do k=1,nlevs
-                do j=1,ny_res
-                   do i=1,nx_res
-!cltorg              workvar3d=workvar3d+workinc3d
-                      workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                    enddo
-                enddo
-             enddo
+             workvar3d=workvar3d+workinc3d
              if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                  clip = tiny(workvar3d(1,1,1))
                  where (workvar3d < clip) workvar3d = clip
@@ -976,23 +897,16 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
 
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
+                nn = nn_tile0
                 do j=1,ny_res
                   do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     workinc3d(i,j,k)=vargrid(nn,levels(qi_ind-1)+k,nb,ne)
                   enddo
                 enddo
-             enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-             do k=1,nlevs
-                do j=1,ny_res
-                   do i=1,nx_res
-                      workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                    enddo
-                 enddo
               enddo
+              workvar3d=workvar3d+workinc3d
               if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                  clip = tiny(workvar3d(1,1,1))
                  where (workvar3d < clip) workvar3d = clip
@@ -1006,23 +920,16 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
 
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
+               nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     workinc3d(i,j,k)=vargrid(nn,levels(qr_ind-1)+k,nb,ne)
                  enddo
                enddo
              enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-             do k=1,nlevs
-                 do j=1,ny_res
-                    do i=1,nx_res
-                       workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                    enddo
-                 enddo
-              enddo
+             workvar3d=workvar3d+workinc3d
              if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                  clip = tiny(workvar3d(1,1,1))
                  where (workvar3d < clip) workvar3d = clip
@@ -1036,23 +943,16 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
 
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
+               nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     workinc3d(i,j,k)=vargrid(nn,levels(qs_ind-1)+k,nb,ne)
                  enddo
                enddo
              enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-             do k=1,nlevs
-                do j=1,ny_res
-                   do i=1,nx_res
-                      workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                    enddo
-                enddo
-             enddo
+             workvar3d=workvar3d+workinc3d
              if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                  clip = tiny(workvar3d(1,1,1))
                  where (workvar3d < clip) workvar3d = clip
@@ -1066,23 +966,16 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
 
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
+                nn = nn_tile0
                 do j=1,ny_res
                   do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     workinc3d(i,j,k)=vargrid(nn,levels(qg_ind-1)+k,nb,ne)
                   enddo
                 enddo
              enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-             do k=1,nlevs
-                do j=1,ny_res
-                   do i=1,nx_res
-                      workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                    enddo
-                enddo
-             enddo
+             workvar3d=workvar3d+workinc3d
              if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                  clip = tiny(workvar3d(1,1,1))
                  where (workvar3d < clip) workvar3d = clip
@@ -1095,24 +988,16 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
              varstrname = 'rain_nc'
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
                nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     workinc3d(i,j,k)=vargrid(nn,levels(qnr_ind-1)+k,nb,ne)
                  enddo
                enddo
              enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-             do k=1,nlevs
-                do j=1,ny_res
-                    do i=1,nx_res
-                       workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                    enddo
-                 enddo
-             enddo
+             workvar3d=workvar3d+workinc3d
              if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                  clip = tiny(workvar3d(1,1,1))
                  where (workvar3d < clip) workvar3d = clip
@@ -1132,15 +1017,14 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
               workprsi(:,:,i)=workvar3d(:,:,i)*0.01_r_kind+workprsi(:,:,i+1)
             enddo
 
-!$omp parallel do schedule(dynamic,1) private(j,i,nn)
+            nn = nn_tile0
             do j=1,ny_res
                do i=1,nx_res
-                  nn=nn_tile0+(j-1)*nx_res+i
+                  nn=nn+1
                   pswork(i,j)=vargrid(nn,levels(n3d)+ps_ind,nb,ne)
                enddo
             enddo
             if(l_pres_add_saved) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
               do k=1,nlevs+1
                 do j=1,ny_res
                    do i=1,nx_res
@@ -1148,14 +1032,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
                    enddo
                 enddo
               enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-              do k=1,nlevs
-                 do j=1,ny_res
-                    do i=1,nx_res
-                      workprsi(i,j,k)=workprsi(i,j,k)+workinc3d2(i,j,k)
-                    enddo
-                  enddo
-              enddo
+              workprsi=workprsi+workinc3d2
             else
               workprsi(:,:,1)=workprsi(:,:,1)+pswork
               do k=2,nlevsp1
@@ -1408,11 +1285,11 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
              if(iope==0)  uworkvar3d(1:nx_res,1:ny_res,k)=workvar2d
         enddo
         if(iope == 0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
            do k=1,nlevs
+               nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     vargrid(nn,levels(u_ind-1)+k,nb,ne)=uworkvar3d(i,j,k) 
                  enddo
                enddo
@@ -1445,11 +1322,11 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
           if(iope==0)  vworkvar3d(1:nx_res,1:ny_res,k)=workvar2d
         enddo
         if(iope==0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
          do k=1,nlevs
+           nn = nn_tile0
            do j=1,ny_res
              do i=1,nx_res
-                nn=nn_tile0+(j-1)*nx_res+i
+                nn=nn+1
                 vargrid(nn,levels(v_ind-1)+k,nb,ne)=vworkvar3d(i,j,k) 
              enddo
            enddo
@@ -1473,11 +1350,11 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
                          mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
           enddo
           if(iope==0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
             do k=1,nlevs
+               nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     vargrid(nn,levels(w_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                  enddo
                enddo
@@ -1520,11 +1397,11 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
          if(iope== 0) then
             if (q_ind > 0) then
                 varstrname = 'sphum'
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                 do k=1,nlevs
+                   nn = nn_tile0
                    do j=1,ny_res
                       do i=1,nx_res
-                         nn=nn_tile0+(j-1)*nx_res+i
+                         nn=nn+1
                          vargrid(nn,levels(q_ind-1)+k,nb,ne)=qworkvar3d(i,j,k) 
                        enddo
                     enddo
@@ -1537,7 +1414,6 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
 
             endif
             if(tv_ind > 0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
                 do k=1,nlevs
                   do j=1,ny_res
                     do i=1,nx_res
@@ -1547,21 +1423,14 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
                  enddo
                  tvworkvar3d=workvar3d
             else! tsen_id >0
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                 do k=1,nlevs
-                   do j=1,ny_res
-                      do i=1,nx_res
-                        workvar3d(i,j,k)=tsenworkvar3d(i,j,k)
-                      enddo
-                    enddo
-                  enddo
+                 workvar3d=tsenworkvar3d
             endif
             tmp_ind=max(tv_ind,tsen_ind) !then can't be both >0 
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
             do k=1,nlevs
+                nn = nn_tile0
                 do j=1,ny_res
                    do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        vargrid(nn,levels(tmp_ind-1)+k,nb,ne)=workvar3d(i,j,k) 
                     enddo
                  enddo
@@ -1589,11 +1458,11 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
                       mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
           enddo
           if(iope ==0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
             do k=1,nlevs
+               nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
-                   nn=nn_tile0+(j-1)*nx_res+i
+                   nn=nn+1
                    vargrid(nn,levels(oz_ind-1)+k,nb,ne)=workvar3d(i,j,k) 
                  enddo
                enddo
@@ -1617,11 +1486,11 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
                       mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
           enddo
           if(iope==0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
+                nn = nn_tile0
                 do j=1,ny_res
                   do i=1,nx_res
-                     nn=nn_tile0+(j-1)*nx_res+i
+                     nn=nn+1
                      vargrid(nn,levels(ql_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                   enddo
                 enddo
@@ -1646,11 +1515,11 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
                          mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
           enddo
           if(iope ==0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
             do k=1,nlevs
+               nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                   nn=nn+1
                    vargrid(nn,levels(qi_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                  enddo
                enddo
@@ -1674,11 +1543,11 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
                          mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
           enddo
           if(iope == 0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
             do k=1,nlevs
+               nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     vargrid(nn,levels(qr_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                  enddo
               enddo
@@ -1697,11 +1566,11 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
           call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
           call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
           if(iope == 0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
             do k=1,nlevs
+               nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
-                    nn=nn_tile0+(j-1)*nx_res+i
+                    nn=nn+1
                     vargrid(nn,levels(qs_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                  enddo
                enddo
@@ -1725,12 +1594,11 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
                          mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
           enddo
           if(iope == 0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
             do k=1,nlevs
                nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
-                   nn=nn_tile0+(j-1)*nx_res+i
+                   nn=nn+1
                    vargrid(nn,levels(qg_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                  enddo
                enddo
@@ -1754,11 +1622,11 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
                         mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
          enddo
          if(iope == 0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
            do k=1,nlevs
+              nn = nn_tile0
               do j=1,ny_res
                 do i=1,nx_res
-                  nn=nn_tile0+(j-1)*nx_res+i
+                  nn=nn+1
                   vargrid(nn,levels(qnr_ind-1)+k,nb,ne)=workvar3d(i,j,k)
                 enddo
               enddo
@@ -1775,7 +1643,6 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
       ! set SST to zero for now
       if (sst_ind > 0) then
         if(iope == 0 ) then
-!clttodo
           vargrid(:,levels(n3d)+sst_ind,nb,ne) = zero
         endif !iope == 0 
       endif
@@ -1806,10 +1673,10 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
 
 
 
-!$omp parallel do schedule(dynamic,1) private(j,i,nn)
+           nn = nn_tile0
            do j=1,ny_res
               do i=1,nx_res
-                 nn=nn_tile0+(j-1)*nx_res+i
+                 nn=nn+1
                  vargrid(nn,levels(n3d)+ps_ind, nb,ne) =pswork(i,j) 
               enddo
            enddo
@@ -1822,7 +1689,6 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
            
 
            
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
            do k=1,nlevs
              do j=1,ny_res  
                do i=1,nx_res
@@ -1835,20 +1701,13 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
              call genqsat1(qworkvar3d,qsatworkvar3d,workvar3d,tvworkvar3d,ice,  &
                           nx_res*ny_res,nlevs)
            else
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-             do k=1,nlevs
-                do j=1,ny_res
-                   do i=1,nx_res
-                     qsatworkvar3d(i,j,k) = 1._r_double
-                    enddo
-                 enddo
-              enddo
+             qsatworkvar3d(:,:,:) = 1._r_double
            endif
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
            do k=1,nlevs
+              nn = nn_tile0
               do j=1,ny_res
                 do i=1,nx_res
-                  nn=nn_tile0+(j-1)*nx_res+i
+                  nn=nn+1
                   qsat(nn,k,nb,ne)=qsatworkvar3d(i,j,k) 
                 enddo
               enddo
@@ -2043,11 +1902,11 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                  if(iope==0)  uworkvar3d(1:nx_res,1:ny_res,k)=workvar2d
               enddo
               if(iope == 0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                 do k=1,nlevs
+                   nn = nn_tile0
                    do j=1,ny_res
                       do i=1,nx_res
-                         nn=nn_tile0+(j-1)*nx_res+i
+                         nn=nn+1
                          workinc3d(i,j,k)=vargrid(nn,levels(u_ind-1)+k,nb,ne) 
                       enddo
                    enddo
@@ -2106,11 +1965,11 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                  if(iope==0)  vworkvar3d(1:nx_res,1:ny_res,k)=workvar2d
               enddo
               if(iope == 0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                 do k=1,nlevs
+                   nn = nn_tile0
                    do j=1,ny_res
                      do i=1,nx_res
-                        nn=nn_tile0+(j-1)*nx_res+i
+                        nn=nn+1
                         workinc3d(i,j,k)=vargrid(nn,levels(v_ind-1)+k,nb,ne) 
                      enddo
                    enddo
@@ -2161,11 +2020,11 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                           mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
               enddo
               if(iope == 0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                  do k=1,nlevs
+                   nn = nn_tile0
                    do j=1,ny_res
                      do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        workinc3d(i,j,k)=vargrid(nn,levels(w_ind-1)+k,nb,ne)
                      enddo
                    enddo
@@ -2193,23 +2052,16 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                           mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
                 enddo
                 if(iope ==0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                   do k=1,nlevs
+                     nn = nn_tile0
                      do j=1,ny_res
                        do i=1,nx_res
-                         nn=nn_tile0+(j-1)*nx_res+i
+                         nn=nn+1
                          workinc3d(i,j,k)=vargrid(nn,levels(tsen_ind-1)+k,nb,ne) 
                        enddo
                      enddo
                   enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                  do k=1,nlevs
-                    do j=1,ny_res
-                      do i=1,nx_res
-                         workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                       enddo
-                     enddo
-                   enddo
+                  workvar3d=workvar3d+workinc3d
                 endif
                 do k=1,nlevs
                    call mpi_scatterv(workvar3d(:,:,k),recvcounts2d,displs2d,mpi_real4,&
@@ -2218,11 +2070,11 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                 call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
               else  ! tv_ind >0  
                 if(iope ==0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                   do k=1,nlevs
+                    nn = nn_tile0
                     do j=1,ny_res
                       do i=1,nx_res
-                        nn=nn_tile0+(j-1)*nx_res+i
+                        nn=nn+1
                         workinc3d(i,j,k)=vargrid(nn,levels(tv_ind-1)+k,nb,ne) 
                       enddo
                     enddo
@@ -2253,49 +2105,21 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                 enddo
        
                 if(iope ==0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                 do k=1,nlevs
-                   do j=1,ny_res
-                      do i=1,nx_res
-                        tvworkvar3d(i,j,k)=tsenworkvar3d(i,j,k)*(one+fv*qworkvar3d(i,j,k))
-                      enddo
-                    enddo
-                  enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                  do k=1,nlevs
-                    do j=1,ny_res
-                      do i=1,nx_res
-                        tvworkvar3d(i,j,k)=tvworkvar3d(i,j,k)+workinc3d(i,j,k)
-                      enddo
-                    enddo
-                  enddo
+                  tvworkvar3d=tsenworkvar3d*(one+fv*qworkvar3d)
+                  tvworkvar3d=tvworkvar3d+workinc3d
                   if(q_ind > 0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                      do k=1,nlevs
+                       nn = nn_tile0
                        do j=1,ny_res
                          do i=1,nx_res
-                           nn=nn_tile0+(j-1)*nx_res+i
+                           nn=nn+1
                            workinc3d(i,j,k)=vargrid(nn,levels(q_ind-1)+k,nb,ne) 
                          enddo
                        enddo
                      enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                     do k=1,nlevs
-                        do j=1,ny_res
-                        do i=1,nx_res
-                          qworkvar3d=qworkvar3d+workinc3d   
-                        enddo
-                        enddo
-                     enddo
+                     qworkvar3d=qworkvar3d+workinc3d   
                   endif
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                  do k=1,nlevs
-                    do j=1,ny_res
-                      do i=1,nx_res
-                         tsenworkvar3d(i,j,k)=tvworkvar3d(i,j,k)/(one+fv*qworkvar3d(i,j,k))
-                      enddo
-                    enddo
-                  enddo
+                  tsenworkvar3d=tvworkvar3d/(one+fv*qworkvar3d)
                 endif
                 varstrname = 'T'
                 call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
@@ -2350,23 +2174,16 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                           mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
               enddo
               if(iope ==  0) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                  do k=1,nlevs
+                    nn = nn_tile0
                     do j=1,ny_res
                       do i=1,nx_res
-                        nn=nn_tile0+(j-1)*nx_res+i
+                        nn=nn+1
                         workinc3d(i,j,k)=vargrid(nn,levels(oz_ind-1)+k,nb,ne) 
                       enddo
                     enddo
                  enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                 do k=1,nlevs
-                   do j=1,ny_res
-                      do i=1,nx_res
-                        workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                      enddo
-                   enddo
-                enddo
+                 workvar3d=workvar3d+workinc3d
                endif
                do k=1,nlevs
                    call mpi_scatterv(workvar3d(:,:,k),recvcounts2d,displs2d,mpi_real4,&
@@ -2386,23 +2203,16 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                           mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
               enddo
               if(iope == 0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                 do k=1,nlevs
+                   nn = nn_tile0
                    do j=1,ny_res
                      do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        workinc3d(i,j,k)=vargrid(nn,levels(ql_ind-1)+k,nb,ne)
                      enddo
                    enddo
                 enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                do k=1,nlevs
-                  do j=1,ny_res
-                      do i=1,nx_res
-                        workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                      enddo
-                   enddo
-                enddo
+                workvar3d=workvar3d+workinc3d
                 if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                      clip = tiny(workvar3d(1,1,1))
                      where (workvar3d < clip) workvar3d = clip
@@ -2427,23 +2237,16 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                           mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
               enddo
               if(iope == 0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                 do k=1,nlevs
+                   nn = nn_tile0
                    do j=1,ny_res
                      do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        workinc3d(i,j,k)=vargrid(nn,levels(qi_ind-1)+k,nb,ne)
                      enddo
                    enddo
                 enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                do k=1,nlevs
-                  do j=1,ny_res
-                      do i=1,nx_res
-                        workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                      enddo
-                   enddo
-                 enddo
+                workvar3d=workvar3d+workinc3d
                  if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                      clip = tiny(workvar3d(1,1,1))
                      where (workvar3d < clip) workvar3d = clip
@@ -2468,23 +2271,16 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                           mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
               enddo
               if(iope == 0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                 do k=1,nlevs
                    nn = nn_tile0
                    do j=1,ny_res
                      do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        workinc3d(i,j,k)=vargrid(nn,levels(qr_ind-1)+k,nb,ne)
                      enddo
                    enddo
                 enddo
-                do k=1,nlevs
-                   do j=1,ny_res
-                      do i=1,nx_res
-                        workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                      enddo
-                   enddo
-                 enddo
+                workvar3d=workvar3d+workinc3d
                  if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                      clip = tiny(workvar3d(1,1,1))
                      where (workvar3d < clip) workvar3d = clip
@@ -2509,23 +2305,16 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                           mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
               enddo
               if(iope == 0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                 do k=1,nlevs
+                   nn = nn_tile0
                    do j=1,ny_res
                      do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        workinc3d(i,j,k)=vargrid(nn,levels(qs_ind-1)+k,nb,ne)
                      enddo
                    enddo
                 enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                do k=1,nlevs
-                   do j=1,ny_res
-                      do i=1,nx_res
-                         workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                      enddo
-                   enddo
-                 enddo
+                workvar3d=workvar3d+workinc3d
                  if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                      clip = tiny(workvar3d(1,1,1))
                      where (workvar3d < clip) workvar3d = clip
@@ -2550,23 +2339,16 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                           mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
               enddo
               if(iope == 0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                 do k=1,nlevs
+                   nn = nn_tile0
                    do j=1,ny_res
                      do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        workinc3d(i,j,k)=vargrid(nn,levels(qg_ind-1)+k,nb,ne)
                      enddo
                    enddo
                 enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                do k=1,nlevs
-                  do j=1,ny_res
-                      do i=1,nx_res
-                        workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                      enddo
-                    enddo
-                enddo
+                workvar3d=workvar3d+workinc3d
                 if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                      clip = tiny(workvar3d(1,1,1))
                      where (workvar3d < clip) workvar3d = clip
@@ -2590,23 +2372,16 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                           mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
               enddo
               if(iope == 0 ) then
-!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                 do k=1,nlevs
+                   nn = nn_tile0
                    do j=1,ny_res
                      do i=1,nx_res
-                       nn=nn_tile0+(j-1)*nx_res+i
+                       nn=nn+1
                        workinc3d(i,j,k)=vargrid(nn,levels(qnr_ind-1)+k,nb,ne)
                      enddo
                    enddo
                 enddo
-!$omp parallel do schedule(dynamic,1) private(k,j,i)
-                do k=1,nlevs
-                  do j=1,ny_res
-                      do i=1,nx_res
-                          workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
-                      enddo
-                   enddo
-                enddo
+                workvar3d=workvar3d+workinc3d
                 if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                      clip = tiny(workvar3d(1,1,1))
                      where (workvar3d < clip) workvar3d = clip

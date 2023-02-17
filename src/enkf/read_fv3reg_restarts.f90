@@ -50,34 +50,13 @@
        character(len=*), intent(in) :: varname
        character(len=*), intent(in) :: filename
        integer(i_kind), intent(in) :: file_id
-       real(r_single), allocatable, dimension(:,:,:) :: data_tmp
        integer(i_kind) :: var_id
-       integer(i_kind)::i,j,k,it
-       integer(i_kind):: ilow,iup, jlow,jup,klow,kup,klev
-       ilow=lbound(data_arr,1)
-       iup=ubound(data_arr,1)
-       jlow=lbound(data_arr,2)
-       jup=ubound(data_arr,2)
-       klow=lbound(data_arr,3)
-       kup=ubound(data_arr,3)
-      allocate(data_tmp(ilow:iup,jlow:jup,klow:kup))
        call nc_check( nf90_inq_varid(file_id,trim(adjustl(varname)),var_id),&
        myname_,'inq_varid '//trim(adjustl(varname))//' '//trim(filename) )
-       call nc_check( nf90_get_var(file_id,var_id,data_tmp),&
+       call nc_check( nf90_get_var(file_id,var_id,data_arr),&
        myname_,'get_var '//trim(adjustl(varname))//' '//trim(filename) )
-!$omp parallel do schedule(dynamic,1) private(k,j,i,klev)
-       do k=klow, kup
-          klev=kup-k+klow
-          do j=jlow, jup
-            do i=ilow, iup
-             data_arr(i,j,klev)=data_tmp(i,j,k)
-            enddo
-         enddo
-       enddo 
-       deallocate(data_tmp)
-
-!       data_arr=data_arr(:,:, &
-!                          ubound(data_arr,3):lbound(data_arr,3):-1)
+       data_arr=data_arr(:,:, &
+                          ubound(data_arr,3):lbound(data_arr,3):-1)
     end subroutine read_fv3_restart_data3d
 
     subroutine read_fv3_restart_data4d(varname,filename,file_id,data_arr)
@@ -87,36 +66,12 @@
        character(len=*), intent(in) :: filename
        integer(i_kind), intent(in) :: file_id
        integer(i_kind) :: var_id
-       real(r_single), allocatable, dimension(:,:,:,:) :: data_tmp
-       integer(i_kind)::i,j,k,it
-       integer(i_kind):: ilow,iup, jlow,jup,klow,kup,tlow,tup,klev
-       ilow=lbound(data_arr,1)
-       iup=ubound(data_arr,1)
-       jlow=lbound(data_arr,2)
-       jup=ubound(data_arr,2)
-       klow=lbound(data_arr,3)
-       kup=ubound(data_arr,3)
-       tlow=lbound(data_arr,4)
-       tup=ubound(data_arr,4)
-       allocate(data_tmp(ilow:iup,jlow:jup,klow:kup,tlow:tup))
        call nc_check( nf90_inq_varid(file_id,trim(adjustl(varname)),var_id),&
        myname_,'inq_varid '//trim(adjustl(varname))//' '//trim(filename) )
-       call nc_check( nf90_get_var(file_id,var_id,data_tmp),&
+       call nc_check( nf90_get_var(file_id,var_id,data_arr),&
        myname_,'get_var '//trim(adjustl(varname))//' '//trim(filename) )
-!$omp parallel do schedule(dynamic,1) private(it,k,j,i,klev)
-       do it=tlow, tup
-        do k=klow, kup
-          klev=kup-k+klow
-          do j=jlow, jup
-            do i=ilow, iup
-             data_arr(i,j,klev,it)=data_tmp(i,j,k,it)
-            enddo
-         enddo
-        enddo 
-       enddo 
-       deallocate(data_tmp)
-!       data_arr=data_arr(:,:, &
-!                          ubound(data_arr,3):lbound(data_arr,3):-1,:)
+       data_arr=data_arr(:,:, &
+                          ubound(data_arr,3):lbound(data_arr,3):-1,ubound(data_arr,4):lbound(data_arr,4):-1)
     end subroutine read_fv3_restart_data4d
 
     end module read_fv3regional_restarts
