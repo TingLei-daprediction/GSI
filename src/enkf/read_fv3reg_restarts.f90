@@ -50,7 +50,7 @@
        character(len=*), intent(in) :: varname
        character(len=*), intent(in) :: filename
        integer(i_kind), intent(in) :: file_id
-       real(r_single), allocatable, dimension(:,:,:) :: data_tmp
+       real(r_single) :: rtmp
        integer(i_kind) :: var_id
        integer(i_kind)::i,j,k,it
        integer(i_kind):: ilow,iup, jlow,jup,klow,kup,klev
@@ -60,21 +60,21 @@
        jup=ubound(data_arr,2)
        klow=lbound(data_arr,3)
        kup=ubound(data_arr,3)
-      allocate(data_tmp(ilow:iup,jlow:jup,klow:kup))
        call nc_check( nf90_inq_varid(file_id,trim(adjustl(varname)),var_id),&
        myname_,'inq_varid '//trim(adjustl(varname))//' '//trim(filename) )
        call nc_check( nf90_get_var(file_id,var_id,data_tmp),&
        myname_,'get_var '//trim(adjustl(varname))//' '//trim(filename) )
-!$omp parallel do schedule(dynamic,1) private(k,j,i,klev)
-       do k=klow, kup
+!$omp parallel do schedule(dynamic,1) private(k,j,i,klev,rtmp)
+       do k=klow, klow+ ceiling((kup-klow+1)/2.0)
           klev=kup-k+klow
           do j=jlow, jup
             do i=ilow, iup
-             data_arr(i,j,klev)=data_tmp(i,j,k)
+             rtmp=data_arr(i,j,k)
+             data_arr(i,j,k)=data_arr(i,j,klev)
+             data_arr(i,j,klev)=rtmp
             enddo
          enddo
        enddo 
-       deallocate(data_tmp)
 
 !       data_arr=data_arr(:,:, &
 !                          ubound(data_arr,3):lbound(data_arr,3):-1)
@@ -87,7 +87,7 @@
        character(len=*), intent(in) :: filename
        integer(i_kind), intent(in) :: file_id
        integer(i_kind) :: var_id
-       real(r_single), allocatable, dimension(:,:,:,:) :: data_tmp
+       real(r_single)  :: rtmp
        integer(i_kind)::i,j,k,it
        integer(i_kind):: ilow,iup, jlow,jup,klow,kup,tlow,tup,klev
        ilow=lbound(data_arr,1)
@@ -98,23 +98,25 @@
        kup=ubound(data_arr,3)
        tlow=lbound(data_arr,4)
        tup=ubound(data_arr,4)
-       allocate(data_tmp(ilow:iup,jlow:jup,klow:kup,tlow:tup))
        call nc_check( nf90_inq_varid(file_id,trim(adjustl(varname)),var_id),&
        myname_,'inq_varid '//trim(adjustl(varname))//' '//trim(filename) )
        call nc_check( nf90_get_var(file_id,var_id,data_tmp),&
        myname_,'get_var '//trim(adjustl(varname))//' '//trim(filename) )
-!$omp parallel do schedule(dynamic,1) private(it,k,j,i,klev)
-       do it=tlow, tup
-        do k=klow, kup
+       do it=tlow, tup  !normally, this dimnsions is very small or even 1, 
+                        ! hence, the openmp parallelization is started from next
+                        ! loop
+!$omp parallel do schedule(dynamic,1) private(k,j,i,klev,rtmp)
+        do k=klow, klow+ ceiling((kup-klow+1)/2.0)
           klev=kup-k+klow
           do j=jlow, jup
             do i=ilow, iup
-             data_arr(i,j,klev,it)=data_tmp(i,j,k,it)
+             rtmp=data_arr(i,j,k,it)
+             data_arr(i,j,k,it)=data_arr(i,j,klev,it)
+             data_arr(i,j,klev,it)=rtmp
             enddo
          enddo
         enddo 
        enddo 
-       deallocate(data_tmp)
 !       data_arr=data_arr(:,:, &
 !                          ubound(data_arr,3):lbound(data_arr,3):-1,:)
     end subroutine read_fv3_restart_data4d

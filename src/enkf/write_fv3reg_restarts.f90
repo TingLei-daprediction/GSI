@@ -52,7 +52,7 @@
        integer(i_kind), intent(in) :: file_id
        integer(i_kind) :: var_id
        integer(i_kind)::i,j,k,it
-       real(r_single), allocatable, dimension(:,:,:) :: data_tmp
+       real(r_single) :: rtmp
        integer(i_kind):: ilow,iup, jlow,jup,klow,kup,klev
        ilow=lbound(data_arr,1)
        iup=ubound(data_arr,1)
@@ -60,13 +60,15 @@
        jup=ubound(data_arr,2)
        klow=lbound(data_arr,3)
        kup=ubound(data_arr,3)
-      allocate(data_tmp(ilow:iup,jlow:jup,klow:kup))
-!$omp parallel do schedule(dynamic,1) private(k,j,i,klev)
-       do k=klow, kup
+!$omp parallel do schedule(dynamic,1) private(k,j,i,klev,rtmp)
+       do k=klow, klow+ceiling((kup-klow+1)/2.0) 
           klev=kup-k+klow
           do j=jlow, jup
             do i=ilow, iup
-             data_tmp(i,j,klev)=data_arr(i,j,k)
+             rtmp=data_arr(i,j,klev)
+             
+             data_arr(i,j,k)=data_arr(i,j,klev)
+             data_arr(i,j,klev)=rtmp
             enddo
          enddo
        enddo 
@@ -88,7 +90,7 @@
        integer(i_kind), intent(in) :: file_id
        integer(i_kind) :: var_id
        integer(i_kind) :: i,j,k,it
-       real(r_single), allocatable, dimension(:,:,:,:) :: data_tmp
+       real(r_single)  :: rtmp
        integer(i_kind):: ilow,iup, jlow,jup,klow,kup,tlow,tup,klev
        ilow=lbound(data_arr,1)
        iup=ubound(data_arr,1)
@@ -98,13 +100,15 @@
        kup=ubound(data_arr,3)
        tlow=lbound(data_arr,4)
        tup=ubound(data_arr,4)
-       allocate(data_tmp(ilow:iup,jlow:jup,klow:kup,tlow:tup))
        do it=tlow, tup
-        do k=klow, kup
+!$omp parallel do schedule(dynamic,1) private(k,j,i,klev,rtmp)
+        do k=klow, klow+ ceiling((kup-klow+1)/2.0)
           klev=kup-k+klow
           do j=jlow, jup
             do i=ilow, iup
-             data_tmp(i,j,klev,it)=data_arr(i,j,k,it)
+             rtmp=data_arr(i,j,k,it)
+             data_arr(i,j,k,it)=data_arr(i,j,klev,it)
+             data_arr(i,j,klev,it)=rtmp
             enddo
          enddo
         enddo 
