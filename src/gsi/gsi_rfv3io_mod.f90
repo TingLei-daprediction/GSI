@@ -1067,7 +1067,7 @@ subroutine read_fv3_netcdf_guess(fv3filenamegin)
           call stop2(333)
       endif
       if(mype == 0) then
-        write(6,*)'thinkdeb ndyvarios3d is ',ndynvario3d
+        write(6,*)'ndyvarios3d is ',ndynvario3d
         do i=1,ndynvario3d
         write(6,*) ' fv3lam_io_dynmetvars3d_nouv is ',trim(fv3lam_io_dynmetvars3d_nouv(i))
         enddo
@@ -2431,7 +2431,6 @@ subroutine gsi_fv3ncdf_read_v1(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin)
         call flush(6)
         call stop2(333)
       endif
-      write(6,*)'thinkdebin read_3d_v1, vgsinnam is',trim(vgsiname),trim(varname)
       ilev=grd_ionouv%lnames(1,ilevtot)
       nz=grd_ionouv%nsig
       nzp1=nz+1
@@ -2439,7 +2438,6 @@ subroutine gsi_fv3ncdf_read_v1(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin)
       startloc=(/1,1,inative+1/)
       countloc=(/nxcase,nycase,1/)
       iret=nf90_inq_varid(gfile_loc,trim(adjustl(varname)),var_id)
-      write(6,*)'thinkdebvarname in read_v1',trim(varname),' ',iret
       if(iret/=nf90_noerr) then
         write(6,*)' wrong to get var_id ',var_id
         call stop2(333)
@@ -4958,20 +4956,6 @@ subroutine gsi_copy_bundle(bundi,bundo)
     call gsi_bundleinquire(bundi,'shortnames::2d',src_name_vars2d,istatus)
     call gsi_bundleinquire(bundo,'shortnames::3d',target_name_vars3d,istatus)
     call gsi_bundleinquire(bundo,'shortnames::2d',target_name_vars2d,istatus)
-  if(mype==0) then
-    do ivar=1,src_nc3d
-       write(6,*)'thinkdeb src3dname is ',trim(src_name_vars3d(ivar))
-    enddo 
-    do ivar=1,src_nc2d
-       write(6,*)'thinkdeb src2dname is ',trim(src_name_vars2d(ivar))
-    enddo
-    do ivar=1,target_nc3d
-       write(6,*)'thinkdeb target3dname is ',trim(target_name_vars3d(ivar))
-    enddo 
-    do ivar=1,target_nc2d
-       write(6,*)'thinkdeb target2dname is ',trim(target_name_vars2d(ivar))
-    enddo
-  endif
     do ivar=1,src_nc3d
       varname=trim(src_name_vars3d(ivar))
       do jvar=1,target_nc3d
@@ -4986,11 +4970,7 @@ subroutine gsi_copy_bundle(bundi,bundo)
       varname=trim(src_name_vars2d(ivar))
       do jvar=1,target_nc2d
         if(index(target_name_vars2d(jvar),varname) > 0)  then
-           write(6,*)'thinkdeb varname is ',trim(varname)
-!clt           tothink
           call GSI_BundleGetPointer (bundi,varname,pvar2d,istatus)
-           write(6,*)'thinkdeb istatus is ',istatus
-           call flush(6)
           call gsi_bundleputvar (bundo,varname,pvar2d,istatus)
           exit
         endif

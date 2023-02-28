@@ -478,6 +478,7 @@ subroutine generate_anl_grid(nx,ny,grid_lon,grid_lont,grid_lat,grid_latt)
   allocate  (   a3dx(ny,nx),a3dx1(ny,nx),a3dy(ny,nx),a3dy1(ny,nx) )
   allocate  (   a3ix(ny,nx),a3ixp(ny,nx),a3jy(ny,nx),a3jyp(ny,nx) )
 !$omp parallel do schedule(dynamic,1) private(j,i,gxa)
+!cltthink grdcrdl
   do i=1,nx
      do j=1,ny
         gxa=xbh_b(i,j)
@@ -495,7 +496,7 @@ subroutine generate_anl_grid(nx,ny,grid_lon,grid_lont,grid_lat,grid_latt)
         a3ixp(j,i)=min(nxa,a3ix(j,i)+1)
      end do
   end do
-
+!cltthink grdcrdl
 !$omp parallel do schedule(dynamic,1) private(j,i,gya)
   do i=1,nx
     do j=1,ny
@@ -819,7 +820,7 @@ subroutine fv3_ll_to_h(a,b,nxa,nya,nxb,nyb,rev_flg)
 !!!!!!!!!! output in reverse E-W, N-S and reversed i,j !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      nybp=nyb+1
      nxbp=nxb+1
-!$omp parallel do schedule(dynamic,1) private(j,i,ir,ijr)
+!$omp parallel do schedule(dynamic,1) private(j,i,ir,ijr,jr)
      do i=1,nyb
         ir=nybp-i
         ijr=(ir-1)*nxb
