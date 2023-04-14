@@ -77,9 +77,8 @@
 !clt                          ubound(data_arr,3):lbound(data_arr,3):-1)
        call nc_check( nf90_inq_varid(file_id,trim(adjustl(varname)),var_id),&
        myname_,'inq_varid '//trim(adjustl(varname))//' '//trim(filename) )
-       call nc_check( nf90_put_var(file_id,var_id,data_tmp),&
+       call nc_check( nf90_put_var(file_id,var_id,data_arr),&
        myname_,'get_var '//trim(adjustl(varname))//' '//trim(filename) )
-       deallocate(data_tmp)
     end subroutine write_fv3_restart_data3d
 
     subroutine write_fv3_restart_data4d(varname,filename,file_id,data_arr)
@@ -119,9 +118,8 @@
 !inconsitency in read part has been fixed
        call nc_check( nf90_inq_varid(file_id,trim(adjustl(varname)),var_id),&
        myname_,'inq_varid '//trim(adjustl(varname))//' '//trim(filename) )
-       call nc_check( nf90_put_var(file_id,var_id,data_tmp),&
+       call nc_check( nf90_put_var(file_id,var_id,data_arr),&
        myname_,'get_var '//trim(adjustl(varname))//' '//trim(filename) )
-       deallocate(data_tmp)
     end subroutine write_fv3_restart_data4d
 
     end module write_fv3regional_restarts
