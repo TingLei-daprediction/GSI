@@ -12,6 +12,8 @@
     use netcdf, only: nf90_inq_dimid,nf90_inq_varid
     use netcdf, only: nf90_nowrite,nf90_inquire,nf90_inquire_dimension
     use netcdf_mod, only: nc_check
+    use mpisetup, only:  mpi_wtime
+    implicit none
     public read_fv3_restart_data1d,read_fv3_restart_data2d
     public read_fv3_restart_data3d,read_fv3_restart_data4d
 
@@ -45,15 +47,29 @@
     end subroutine read_fv3_restart_data2d
 
     subroutine read_fv3_restart_data3d(varname,filename,file_id,data_arr)
+       use  omp_lib
        real(r_single), intent(inout), dimension(:,:,:) :: data_arr
        character(len=24),parameter :: myname_ = 'read_fv3_restart_data3d'
        character(len=*), intent(in) :: varname
        character(len=*), intent(in) :: filename
        integer(i_kind), intent(in) :: file_id
        real(r_single) :: rtmp
+
+
        integer(i_kind) :: var_id
        integer(i_kind)::i,j,k,it
        integer(i_kind):: ilow,iup, jlow,jup,klow,kup,klev
+
+
+       integer numThreads
+       real  t1,t2
+
+        !$omp parallel
+          numThreads = omp_get_num_threads()
+        !$omp end parallel
+        write(6,*)'thinkdeb number of threads is ',numThreads
+
+
        ilow=lbound(data_arr,1)
        iup=ubound(data_arr,1)
        jlow=lbound(data_arr,2)
@@ -62,8 +78,9 @@
        kup=ubound(data_arr,3)
        call nc_check( nf90_inq_varid(file_id,trim(adjustl(varname)),var_id),&
        myname_,'inq_varid '//trim(adjustl(varname))//' '//trim(filename) )
-       call nc_check( nf90_get_var(file_id,var_id,data_tmp),&
+       call nc_check( nf90_get_var(file_id,var_id,data_arr),&
        myname_,'get_var '//trim(adjustl(varname))//' '//trim(filename) )
+       t1=mpi_wtime()
 !$omp parallel do schedule(dynamic,1) private(k,j,i,klev,rtmp)
        do k=klow, klow+ ceiling((kup-klow+1)/2.0)
           klev=kup-k+klow
@@ -75,9 +92,14 @@
             enddo
          enddo
        enddo 
+       t2=mpi_wtime()
+       write(6,*)'thinkdeb openmp time is ',t2-t1
 
-!       data_arr=data_arr(:,:, &
-!                          ubound(data_arr,3):lbound(data_arr,3):-1)
+       t1=mpi_wtime()
+       data_arr=data_arr(:,:, &
+                          ubound(data_arr,3):lbound(data_arr,3):-1)
+       t2=mpi_wtime()
+       write(6,*)'thinkdeb no-openmp time is ',t2-t1
     end subroutine read_fv3_restart_data3d
 
     subroutine read_fv3_restart_data4d(varname,filename,file_id,data_arr)
@@ -100,7 +122,7 @@
        tup=ubound(data_arr,4)
        call nc_check( nf90_inq_varid(file_id,trim(adjustl(varname)),var_id),&
        myname_,'inq_varid '//trim(adjustl(varname))//' '//trim(filename) )
-       call nc_check( nf90_get_var(file_id,var_id,data_tmp),&
+       call nc_check( nf90_get_var(file_id,var_id,data_arr),&
        myname_,'get_var '//trim(adjustl(varname))//' '//trim(filename) )
        do it=tlow, tup  !normally, this dimnsions is very small or even 1, 
                         ! hence, the openmp parallelization is started from next

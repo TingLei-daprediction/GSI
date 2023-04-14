@@ -12,6 +12,7 @@
     use netcdf, only: nf90_inq_dimid,nf90_inq_varid
     use netcdf, only: nf90_nowrite,nf90_inquire,nf90_inquire_dimension
     use netcdf_mod, only: nc_check
+    implicit none
     public write_fv3_restart_data1d,write_fv3_restart_data2d
     public write_fv3_restart_data3d,write_fv3_restart_data4d
 

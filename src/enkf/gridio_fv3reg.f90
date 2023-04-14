@@ -49,6 +49,7 @@ module gridio
   use netcdf_mod,only: nc_check
   use mpimod, only: mpi_comm_world, mpi_sum, mpi_real4, mpi_real8, mpi_rtype
   use mpimod, only:  mpi_status_size
+  use mpisetup,only: mpi_wtime
 
   implicit none
 
@@ -133,10 +134,13 @@ contains
     integer (i_kind):: ps_ind, sst_ind
     integer (i_kind):: tmp_ind,ifile
     logical (i_kind):: ice
+    real tot1,tot2
+    real t1,t2
 
     !======================================================================
     write (6,*)"The input fileprefix, reducedgrid are not used in the current implementation", &
            fileprefixes, reducedgrid
+    tot1=mpi_wtime()
     nlevsp1=nlevs+1
     u_ind   = getindex(vars3d, 'u')   !< indices in the state var arrays
     v_ind   = getindex(vars3d, 'v')   ! U and V (3D)
@@ -217,7 +221,9 @@ contains
 
          !----------------------------------------------------------------------
          ! Update u and v variables (same for NMM and ARW)
-           
+    write(6,*)'thinkdeb readgridata 10'
+    call flush(6)
+           t1=mpi_wtime() 
            if (u_ind > 0) then
              allocate(uworkvar3d(nx_res,ny_res+1,nlevs))
              varstrname = 'u'
@@ -241,6 +247,9 @@ contains
 
              deallocate(uworkvar3d)
            endif
+           t2=mpi_wtime() 
+           write(6,*)'thinkdeb read u t ',t2-t1
+           t1=mpi_wtime() 
            if (v_ind > 0) then
              allocate(vworkvar3d(nx_res+1,ny_res,nlevs))
              varstrname = 'v'
@@ -264,6 +273,9 @@ contains
              deallocate(vworkvar3d)
 
            endif
+           t2=mpi_wtime() 
+           write(6,*)'thinkdeb read v t ',t2-t1
+           t1=mpi_wtime() 
            if (w_ind > 0) then
               varstrname = 'W'
               call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
@@ -286,8 +298,13 @@ contains
               enddo
 
            endif
+           t2=mpi_wtime() 
+           write(6,*)'thinkdeb read w t ',t2-t1
+    write(6,*)'thinkdeb readgridata 11'
+    call flush(6)
 
            if (tv_ind > 0 .or. tsen_ind > 0) then
+           t1=mpi_wtime() 
               allocate(tsenworkvar3d(nx_res,ny_res,nlevs))
               varstrname = 'T'
               call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
@@ -296,6 +313,9 @@ contains
               call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
               call read_fv3_restart_data3d(varstrname,fv3filename,file_id,qworkvar3d)
 
+           t2=mpi_wtime() 
+           write(6,*)'thinkdeb read q 1 t ',t2-t1
+           t1=mpi_wtime() 
 
               if (q_ind > 0) then
                   varstrname = 'sphum'
@@ -317,6 +337,9 @@ contains
                    enddo
 
               endif
+           t2=mpi_wtime() 
+           write(6,*)'thinkdeb process q  t ',t2-t1
+           t1=mpi_wtime() 
               if(tv_ind > 0) then
 !$omp parallel do schedule(dynamic,1) private(k,j,i)
                  do k=1,nlevs
@@ -330,16 +353,18 @@ contains
                  do k=1,nlevs
                    do j=1,ny_res
                       do i=1,nx_res
-                         tvworkvar3d=workvar3d
+                         tvworkvar3d(i,j,k)=workvar3d(i,j,k)
                       enddo
                    enddo
                  enddo
+           t2=mpi_wtime() 
+           write(6,*)'thinkdeb tv_ind t ',t2-t1
               else! tsen_id >0
 !$omp parallel do schedule(dynamic,1) private(k,j,i)
                  do k=1,nlevs
                    do j=1,ny_res
                       do i=1,nx_res
-                        workvar3d=tsenworkvar3d
+                        workvar3d(i,j,k)=tsenworkvar3d(i,j,k)
                       enddo
                     enddo
                   enddo
@@ -365,6 +390,8 @@ contains
 
            endif
            if(allocated(tsenworkvar3d)) deallocate(tsenworkvar3d)
+    write(6,*)'thinkdeb readgridata 17'
+    call flush(6)
                    
 
             
@@ -498,6 +525,8 @@ contains
 
            endif
 
+    write(6,*)'thinkdeb readgridata 19'
+    call flush(6)
            if (qnr_ind > 0) then
                varstrname = 'rain_nc'
                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
@@ -523,11 +552,12 @@ contains
                varstrname = 'ref_f3d'
                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
                call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
                do k=1,nlevs
-                   nn = nn_tile0
+!clt                   nn = nn_tile0
                    do j=1,ny_res
                      do i=1,nx_res
-                       nn=nn+1
+                    nn=nn_tile0+(j-1)*nx_res+i
                        vargrid(nn,levels(dbz_ind-1)+k,nb,ne)=max(workvar3d(i,j,nlevs+1-k),0.0_r_kind)
                      enddo
                    enddo
@@ -582,7 +612,7 @@ contains
 
               
               
-
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
               do k=1,nlevs
                 do j=1,ny_res  
                  do i=1,nx_res
@@ -609,6 +639,8 @@ contains
                     
                   
 
+    write(6,*)'thinkdeb readgridata 19'
+    call flush(6)
 
 
               if(allocated(workprsi))     deallocate(workprsi)
@@ -636,7 +668,9 @@ contains
 
       end do backgroundloop ! loop over backgrounds to read in
     end do ensmemloop ! loop over ens members to read in 
-
+    tot2=mpi_wtime()
+    write(6,*)'thinkdeb readgridata 20, tot t ',tot2-tot1
+    call flush(6)
     return
 
 end subroutine readgriddata
@@ -689,6 +723,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
                         workprsi,qworkvar3d
 
     real(r_single)              :: clip
+    real :: t1,t2
 
     !----------------------------------------------------------------------
     ! Define variables required by for extracting netcdf variable
@@ -705,7 +740,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
 
 
     
-    write(6,*)"anlfileprefixes, fgfileprefixes are not used in the current implementation", &
+    write(6,*)"anlfileprefixesthinkdeb, fgfileprefixes are not used in the current implementation", &
                anlfileprefixes, fgfileprefixes  
     write(6,*)"the no_inflate_flag is not used in the currrent implementation ",no_inflate_flag
     !----------------------------------------------------------------------
@@ -1003,6 +1038,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
                   enddo
                 enddo
              enddo
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
              do k=1,nlevs
                 do j=1,ny_res
                    do i=1,nx_res
@@ -1063,6 +1099,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
                  enddo
                enddo
              enddo
+             t1=mpi_wtime()
 !$omp parallel do schedule(dynamic,1) private(k,j,i)
              do k=1,nlevs
                  do j=1,ny_res
@@ -1071,6 +1108,13 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
                     enddo
                  enddo
               enddo
+               t2=mpi_wtime()
+               write(6,*)"thinkdeb255 1 dt is ",t2-t1
+             t1=mpi_wtime()
+                       workvar3d=workvar3d+workinc3d
+             t2=mpi_wtime()
+               write(6,*)"thinkdeb255 2 dt is ",t2-t1
+
              if ( l_use_enkf_directZDA .and. cliptracers ) then ! set cliptracers to remove negative hydrometers
                  clip = tiny(workvar3d(1,1,1))
                  where (workvar3d < clip) workvar3d = clip
@@ -1145,7 +1189,7 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
 !$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
              do k=1,nlevs
-               nn = nn_tile0
+!clt               nn = nn_tile0
                do j=1,ny_res
                  do i=1,nx_res
                     nn=nn_tile0+(j-1)*nx_res+i
@@ -1168,21 +1212,31 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
              call write_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
 
           endif
-
+          write(6,*)'thinkdeb255 dbz_ind is ',dbz_ind
           if (dbz_ind > 0) then
              varstrname = 'ref_f3d'
              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
              do k=1,nlevs
-                nn = nn_tile0
+!clt                nn = nn_tile0
                 do j=1,ny_res
                    do i=1,nx_res
-                      nn=nn+1
+!clt                      nn=nn+1
+                    nn=nn_tile0+(j-1)*nx_res+i
                       workinc3d(i,j,nlevs+1-k)=vargrid(nn,levels(dbz_ind-1)+k,nb,ne)
                    enddo
                 enddo
              enddo
-             workvar3d=workvar3d+workinc3d
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
+             do k=1,nlevs
+               do j=1,ny_res
+                  do i=1,nx_res
+                     workvar3d(i,j,k)=workvar3d(i,j,k)+workinc3d(i,j,k)
+                  enddo
+                enddo
+              enddo
+
              where (workvar3d < 0.0_r_kind) workvar3d = 0.0_r_kind
              call write_fv3_restart_data3d(varstrname,fv3filename,file_id,workvar3d)
 
@@ -1613,7 +1667,14 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
                     enddo
                    enddo
                  enddo
-                 tvworkvar3d=workvar3d
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
+             do k=1,nlevs
+                do j=1,ny_res
+                  do i=1,nx_res
+                    tvworkvar3d(i,j,k)=workvar3d(i,j,k)
+                  enddo
+                enddo
+              enddo 
             else! tsen_id >0
 !$omp parallel do schedule(dynamic,1) private(k,j,i)
                  do k=1,nlevs

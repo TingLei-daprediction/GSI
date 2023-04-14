@@ -58,7 +58,6 @@ use kinds,     only: r_kind, i_kind, r_double, r_single
 use mpeu_util, only: gettablesize, gettable, getindex
 use constants, only: max_varname_length
 implicit none
-
 private
 
 public :: read_control, write_control, controlvec_cleanup, init_controlvec
@@ -224,7 +223,8 @@ if (nproc <= ntasks_io-1) then
       call readgriddata(nanal1(nproc),nanal2(nproc),cvars3d,cvars2d,nc3d,nc2d,clevels,ncdim,nbackgrounds, &
            fgfileprefixes,fgsfcfileprefixes,reducedgrid,grdin,qsat)
    end if
-   !print *,'min/max qsat',nanal,'=',minval(qsat),maxval(qsat)
+   call mpi_barrier(mpi_comm_world,ierr)
+   write(6,*)'thinkdeb min/max qsat','=',minval(qsat),maxval(qsat)
    if (use_qsatensmean) then
        allocate(qsatmean(npts,nlevs,nbackgrounds))
        allocate(qsat_tmp(npts))
