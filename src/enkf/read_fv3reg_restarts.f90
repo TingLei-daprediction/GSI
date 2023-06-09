@@ -92,14 +92,15 @@
             enddo
          enddo
        enddo 
-       t2=mpi_wtime()
-       write(6,*)'thinkdeb openmp time is ',t2-t1
-
-       t1=mpi_wtime()
-       data_arr=data_arr(:,:, &
-                          ubound(data_arr,3):lbound(data_arr,3):-1)
-       t2=mpi_wtime()
-       write(6,*)'thinkdeb no-openmp time is ',t2-t1
+!#ifdef 0
+!       t2=mpi_wtime()
+!       write(6,*)'thinkdeb openmp time is ',t2-t1
+!       t1=mpi_wtime()
+!       data_arr=data_arr(:,:, &
+!                          ubound(data_arr,3):lbound(data_arr,3):-1)
+!       t2=mpi_wtime()
+!       write(6,*)'thinkdeb no-openmp time is ',t2-t1
+!#endif
     end subroutine read_fv3_restart_data3d
 
     subroutine read_fv3_restart_data4d(varname,filename,file_id,data_arr)

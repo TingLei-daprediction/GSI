@@ -248,6 +248,7 @@ logical,public ::l_fv3reg_filecombined =.true.  !=.true., the dynvar and tracer 
 
 ! for parallel netCDF
 logical, public :: paranc = .false.
+logical, public :: l_fv3sar_on_subdomain = .false.
 logical, public :: nccompress = .false.
 
 ! for writing increments
@@ -283,7 +284,7 @@ namelist /nam_enkf/datestring,datapath,iassim_order,nvars,&
                    eft,wmoist,adrate,andataname,&
                    gdatehr,datehr,&
                    tar_minlat,tar_maxlat,tar_minlon,tar_maxlon,tar_minlev,tar_maxlev,&
-                   fv3_native, paranc, nccompress, write_fv3_incr,incvars_to_zero,write_ensmean, &
+                   fv3_native, paranc,l_fv3sar_on_subdomain, nccompress, write_fv3_incr,incvars_to_zero,write_ensmean, &
                    corrlengthrdrnh,corrlengthrdrsh,corrlengthrdrtr,&
                    lnsigcutoffrdrnh,lnsigcutoffrdrsh,lnsigcutoffrdrtr,&
                    l_use_enkf_directZDA

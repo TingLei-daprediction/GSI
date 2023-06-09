@@ -48,6 +48,7 @@ module gridio
   use read_fv3regional_restarts,only:read_fv3_restart_data3d,read_fv3_restart_data4d
   use netcdf_mod,only: nc_check
   use mpimod, only: mpi_comm_world, mpi_sum, mpi_real4, mpi_real8, mpi_rtype
+  use mpimod,only : MPI_INFO_NULL
   use mpimod, only:  mpi_status_size
   use mpisetup,only: mpi_wtime
 
@@ -83,7 +84,17 @@ module gridio
   type(type_fv3lamfile) :: fv3lamfile
   integer(i_kind), allocatable, dimension(:) :: mem_pe, iocomms
   integer(i_kind),public :: iope, ionumproc,iocomtest
-   
+  
+!clt 
+  integer(i_kind),dimension(:),allocatable :: numlev_at_process_array
+  integer(i_kind),dimension(:),allocatable:: numproc_io_member_array
+  integer(i_kind),dimension(:),allocatable:: count_numproc_io_member_array
+  integer(i_kind),dimension(:,:), allocatable :: rangelev_at_process_array
+  integer(i_kind),dimension(:),allocatable  :: recvcounts3d,displs3d 
+  integer(i_kind),dimension(:),allocatable  :: u_recvcounts3d,u_displs3d 
+  integer(i_kind),dimension(:),allocatable  :: v_recvcounts3d,v_displs3d 
+  integer(i_kind):: loc_nlevs,kbgn_loc,kend_loc
+  integer(i_kind):: local_mpi_world
        
 contains
   subroutine readgriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
@@ -125,6 +136,7 @@ contains
     character(len=1) char_tile
     character(len=24),parameter :: myname_ = 'fv3: getgriddata'
 
+    real(r_single)              :: clip
     ! Define counting variables
     integer(i_kind) :: nlevsp1
     integer (i_kind):: i,j, k,nn,ntile,nn_tile0, nb,nanal,ne
@@ -221,8 +233,6 @@ contains
 
          !----------------------------------------------------------------------
          ! Update u and v variables (same for NMM and ARW)
-    write(6,*)'thinkdeb readgridata 10'
-    call flush(6)
            t1=mpi_wtime() 
            if (u_ind > 0) then
              allocate(uworkvar3d(nx_res,ny_res+1,nlevs))
@@ -312,6 +322,11 @@ contains
               varstrname = 'sphum'
               call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
               call read_fv3_restart_data3d(varstrname,fv3filename,file_id,qworkvar3d)
+              if ( cliptracers ) then ! 
+                 clip = tiny(qworkvar3d(1,1,1))
+                 where (qworkvar3d < clip) qworkvar3d = clip
+              end if
+
 
            t2=mpi_wtime() 
            write(6,*)'thinkdeb read q 1 t ',t2-t1
@@ -609,6 +624,11 @@ contains
                     vargrid(nn,levels(n3d)+ps_ind, nb,ne) =pswork(i,j) 
                  enddo
               enddo
+           if(nproc==0) then 
+                  write(6,*) 'READFVregional : ps ',                           &
+                      & k, minval(vargrid(:,levels(n3d)+ps_ind,nb,ne)), maxval(vargrid(:,levels(n3d)+ps_ind,nb,ne))
+
+           endif !nproc==0  
 
               
               
@@ -931,6 +951,10 @@ subroutine writegriddata(nanal1,nanal2,vars3d,vars2d,n3d,n2d,levels,ndim,vargrid
               varstrname = 'sphum'
               call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
               call read_fv3_restart_data3d(varstrname,fv3filename,file_id,qworkvar3d)
+              if ( cliptracers ) then ! 
+                 clip = tiny(qworkvar3d(1,1,1))
+                 where (qworkvar3d < clip) qworkvar3d = clip
+              end if
 !$omp parallel do schedule(dynamic,1) private(k,j,i)
                  do k=1,nlevs
                    do j=1,ny_res
@@ -1355,7 +1379,7 @@ subroutine writeincrement_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,grdin,no_inflate
   real(r_single), dimension(npts,ndim,nbackgrounds,1), intent(inout) :: grdin
   logical, intent(in) :: no_inflate_flag
 end subroutine writeincrement_pnc
-  
+#ifdef  FV3_LAM_ON_SUBDOMAIN  
 subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
                                fileprefixes,filesfcprefixes,reducedgrid,vargrid,qsat)
   use constants, only: max_varname_length
@@ -1385,7 +1409,7 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
                       vworkvar3d,tvworkvar3d,tsenworkvar3d,&
                       workprsi,qworkvar3d
   real(r_single), dimension(:,:,:), allocatable ::locworkvar3d,locuworkvar3d,&
-                      locvworkvar3d,loctsenworkvar3d,&
+                      locvworkvar3d,loctsenworkvar3d,loctvworkvar3d&
                       locqworkvar3d
   real(r_double),dimension(:,:,:),allocatable:: qsatworkvar3d
   real(r_single), dimension(:,:),   allocatable ::pswork
@@ -1620,6 +1644,7 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
              allocate(tsenworkvar3d(1,1,nlevs))
          endif
          allocate(loctsenworkvar3d(nxloc,nyloc,nlevs))
+         allocate(loctvworkvar3d(nxloc,nyloc,nlevs))
          allocate(locqworkvar3d(nxloc,nyloc,nlevs))
       
          varstrname = 'T'
@@ -1628,6 +1653,10 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
          varstrname = 'sphum'
          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
          call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locqworkvar3d)
+         if ( cliptracers ) then ! 
+             clip = tiny(locqworkvar3d(1,1,1))
+             where (locqworkvar3d < clip) locqworkvar3d = clip
+         end if
          do k=1,nlevs
            call mpi_gatherv(loctsenworkvar3d(1:nxloc,1:nyloc,k), recvcounts2d(iope+1), mpi_real4,&
                              tsenworkvar3d(:,:,k), recvcounts2d, displs2d,&
@@ -1945,7 +1974,7 @@ subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
 
            if(nproc==0) then 
                   write(6,*) 'READFVregional : ps ',                           &
-                      & k, minval(vargrid(:,levels(n3d)+ps_ind,nb,ne)), maxval(vargrid(:,k,nb,ne))
+                      & 1, minval(vargrid(:,levels(n3d)+ps_ind,nb,ne)), maxval(vargrid(:,levels(n3d)+ps_ind,nb,ne))
 
            endif !nproc==0  
            
@@ -2044,7 +2073,7 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                         vworkvar3d,tvworkvar3d,tsenworkvar3d,&
                         workprsi,qworkvar3d,workinc3d,workinc3d2
     real(r_single), dimension(:,:,:), allocatable ::locworkvar3d,locuworkvar3d,&
-                        locvworkvar3d,loctsenworkvar3d,&
+                        locvworkvar3d,loctsenworkvar3d,loctvworkvar3d,&
                         locqworkvar3d
     real(r_single), dimension(:,:),allocatable :: loc2dsend,loc2drecv
     real(r_single), dimension(:,:),allocatable :: workvar2d
@@ -2365,6 +2394,7 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                   allocate(tsenworkvar3d(1,1,nlevs))
                 endif
                 allocate(loctsenworkvar3d(nxloc,nyloc,nlevs))
+                allocate(loctvworkvar3d(nxloc,nyloc,nlevs))
                 call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
                 call read_fv3_restart_data3d(varstrname,fv3filename,file_id,loctsenworkvar3d)
                 do k=1,nlevs
@@ -2375,6 +2405,10 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                 varstrname = 'sphum'
                 call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
                 call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locqworkvar3d)
+                if ( cliptracers ) then ! 
+                   clip = tiny(locqworkvar3d(1,1,1))
+                   where (qworkvar3d < clip) locqworkvar3d = clip
+                end if
                 do k=1,nlevs
                   call mpi_gatherv(locqworkvar3d(1:nxloc,1:nyloc,k), recvcounts2d(iope+1), mpi_real4, &
                             qworkvar3d(:,:,k), recvcounts2d, displs2d,&
@@ -2462,6 +2496,7 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
                 endif !q_ind
                 deallocate(tsenworkvar3d)
                 if (allocated(loctsenworkvar3d))  deallocate(loctsenworkvar3d)
+                if (allocated(loctvworkvar3d))  deallocate(loctvworkvar3d)
                 deallocate(locqworkvar3d)
                 
               endif !tv_snd / tsne_ind
@@ -2832,6 +2867,1785 @@ subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflat
     ! Return calculated values
     return
 end subroutine writegriddata_pnc
+#else !# FV3_LAM_ON_SUBDOMAIN
+subroutine readgriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,ntimes, &
+                               fileprefixes,filesfcprefixes,reducedgrid,vargrid,qsat)
+  use constants, only: max_varname_length
+  use constants, only:zero,one,half,fv, max_varname_length
+  use gridinfo,only: eta1_ll
+  use netcdf, only: nf90_open,nf90_close,nf90_get_var,nf90_noerr
+  use netcdf, only: nf90_inq_dimid,nf90_inq_varid
+  use netcdf, only: nf90_nowrite,nf90_write,nf90_inquire,nf90_inquire_dimension
+  use netcdf, only: nf90_get_var
+  implicit none
+  character(len=max_varname_length), dimension(n2d), intent(in) :: vars2d
+  character(len=max_varname_length), dimension(n3d), intent(in) :: vars3d
+  integer(i_kind), intent(in) :: n2d, n3d
+  integer(i_kind), dimension(0:n3d), intent(in) :: levels
+  integer(i_kind), intent(in) :: ndim, ntimes
+  character(len=120), dimension(7), intent(in)  :: fileprefixes
+  character(len=120), dimension(7), intent(in)  :: filesfcprefixes
+  logical, intent(in) :: reducedgrid
+  real(r_single), dimension(npts,ndim,ntimes,1), intent(out) ::vargrid 
+  real(r_double), dimension(npts,nlevs,ntimes,1), intent(out) :: qsat
+  character(len=24),parameter :: myname_ = 'fv3: readgriddata_pnc'
+  character(len=500) :: filename
+  character(len=:),allocatable :: fv3filename,fv3filename1
+  character(len=7)   :: charnanal
+  integer(i_kind) file_id,file_id1
+  integer(i_kind):: numproc_io_member
+  real(r_single), dimension(:,:,:), allocatable ::workvar3d,uworkvar3d,&
+                      vworkvar3d,tvworkvar3d,tsenworkvar3d,&
+                      workprsi,qworkvar3d
+  real(r_single), dimension(:,:,:), allocatable ::locworkvar3d,locuworkvar3d,&
+                      locvworkvar3d,loctsenworkvar3d,loctvworkvar3d,&
+                      locqworkvar3d
+  real(r_double),dimension(:,:,:),allocatable:: qsatworkvar3d
+  real(r_single), dimension(:,:),   allocatable ::pswork
+  real(r_single), dimension(:,:),   allocatable ::workvar2d
+  real(r_single),dimension(:,:), allocatable::u2d,v2d
+  character(len=12) :: varstrname
+  character(len=1) char_tile
+  character(len=24) strsubid
+  integer(i_kind) :: nlevsp1
+  integer(i_kind) :: u_ind, v_ind, tv_ind,tsen_ind, q_ind, oz_ind
+  integer(i_kind) :: w_ind, ql_ind, qi_ind, qr_ind, qs_ind, qg_ind, qnr_ind
+  integer(i_kind) :: ps_ind, sst_ind
+  integer(i_kind) :: tmp_ind,ifile
+  integer(i_kind) :: VarId
+  logical :: ice
+  integer(i_kind) countloc(3),startloc(3)
+  integer(i_kind) :: nzp1,inative,ipe,isub,klev
+  integer(i_kind) :: i,j,ii, k,ianal,nn,ntile,nn_tile0, nb,nanal,ne,iret
+  integer(i_kind) :: k0,kcpu,num2d
+  real(r_single)              :: clip
+
+  !======================================================================
+  write (6,*)"The input fileprefix, reducedgrid are not used in the current implementation", &
+         fileprefixes, reducedgrid
+  ! Initialize all constants required by routine
+  nlevsp1=nlevs+1
+  u_ind   = getindex(vars3d, 'u')   !< indices in the state var arrays
+  v_ind   = getindex(vars3d, 'v')   ! U and V (3D)
+  w_ind   = getindex(vars3d, 'w')   ! W (3D)
+  tv_ind  = getindex(vars3d, 't')  ! Tv (3D)
+  q_ind   = getindex(vars3d, 'q')   ! Q (3D)
+  oz_ind  = getindex(vars3d, 'oz')  ! Oz (3D)
+  tsen_ind = getindex(vars3d, 'tsen') !sensible T (3D)
+
+  ql_ind  = getindex(vars3d, 'ql')   ! Q cloud water (3D)
+  qi_ind  = getindex(vars3d, 'qi')   ! Q cloud ice (3D)
+  qr_ind  = getindex(vars3d, 'qr')   ! Q rain water (3D)
+  qs_ind  = getindex(vars3d, 'qs')   ! Q snow (3D)
+  qg_ind  = getindex(vars3d, 'qg')   ! Q graupel (3D)
+  qnr_ind  = getindex(vars3d, 'qnr') ! N rain (3D)    
+
+  ps_ind  = getindex(vars2d, 'ps')  ! Ps (2D)
+  sst_ind = getindex(vars2d, 'sst') ! SST (2D)
+  ! figure out what member to read and do MPI sub-communicator things
+  allocate(numproc_io_member_array(nanals))
+  allocate(count_numproc_io_member_array(nanals))
+  call distribute_items(numproc,nanals,numproc_io_member_array)  
+
+  
+  if(numproc < nanals) then
+     write(6,*)"there are no enough MPI process for FV3-LAM IO   &
+                 for this IO option, stop"  
+     call stop2(23)
+  endif 
+  !numproc_io_member will all be the mpi number for the group of mpi of this
+  !member   
+  allocate(mem_pe(0:numproc-1))
+  allocate(iocomms(nanals))
+  mem_pe=nanals+1  !this subroup will not be used
+  count_numproc_io_member_array=0
+  ipe=0
+  do isub=1,maxval(numproc_io_member_array) ! to make sure each of the first ntasks_io MPI proces 
+                              ! correppond each iope=0 of each group of processes for each member
+     do ianal=1,nanals
+       count_numproc_io_member_array(ianal)=count_numproc_io_member_array(ianal)+1
+       if (count_numproc_io_member_array(ianal).le.numproc_io_member_array(ianal)) then
+       mem_pe(ipe)=ianal   
+       ipe=ipe+1
+       endif
+     enddo
+  enddo
+  ne=1 
+  nb=1
+  do i=0,numproc-1
+    write(6,*)' mem_pe is ',mem_pe(i)
+  enddo
+  nanal = mem_pe(nproc)
+
+  call mpi_comm_split(mpi_comm_world, mem_pe(nproc), nproc, iocomms(mem_pe(nproc)), iret)
+  call mpi_comm_rank(iocomms(mem_pe(nproc)), iope, iret)
+  call mpi_comm_size(iocomms(mem_pe(nproc)), ionumproc, iret)
+  local_mpi_world=iocomms(mem_pe(nproc))
+  if(numproc_io_member_array(nanal).ne.ionumproc) then
+   write(6,*)'something is wrong for distrubtion of mpi over member , stop'
+   call stop2(23)
+  endif
+  write(6,*)'thinkdeb255, nanal, ionumproc ',nanal,ionumproc 
+  numproc_io_member=ionumproc
+!cltothink
+  if(iope == 0) then
+     allocate(workvar3d(nx_res,ny_res,nlevs))
+     allocate(qworkvar3d(nx_res,ny_res,nlevs))
+     allocate(qsatworkvar3d(nx_res,ny_res,nlevs))
+     allocate(tvworkvar3d(nx_res,ny_res,nlevs))
+  else
+     allocate(workvar3d(1,1,1))
+     allocate(qworkvar3d(1,1,1))
+     allocate(qsatworkvar3d(1,1,1))
+     allocate(tvworkvar3d(1,1,1))
+  endif
+  allocate(workvar2d(nx_res,ny_res))
+
+  allocate( numlev_at_process_array(numproc_io_member))
+  allocate( rangelev_at_process_array(2,numproc_io_member))
+  allocate(recvcounts3d(numproc_io_member))
+  allocate(displs3d(numproc_io_member))
+  allocate(u_recvcounts3d(numproc_io_member))
+  allocate(u_displs3d(numproc_io_member))
+  allocate(v_recvcounts3d(numproc_io_member))
+  allocate(v_displs3d(numproc_io_member))
+  call distribute_items(nlevs,numproc_io_member,numlev_at_process_array)  
+  do i=1,numproc_io_member
+  write(6,*)"ithinkdeb333,nloc_lev is ",numlev_at_process_array(i)
+  enddo
+  k0=1
+  do kcpu=1,numproc_io_member
+       rangelev_at_process_array(1,kcpu)=k0
+       k0=k0+numlev_at_process_array(kcpu)
+       rangelev_at_process_array(2,kcpu)=k0-1
+  enddo
+  num2d=nx_res*ny_res
+  do kcpu=1,numproc_io_member
+     recvcounts3d(kcpu)=num2d*numlev_at_process_array(kcpu) 
+     if(kcpu == 1) then
+       displs3d(kcpu)=0
+     else
+       displs3d(kcpu)=displs3d(kcpu-1)+recvcounts3d(kcpu-1)
+     endif
+  enddo
+  write(6,*)'thinkdebxxx sum ',sum(numlev_at_process_array), ' expected is ',nlevs
+  num2d=nx_res*(ny_res+1)
+  do kcpu=1,numproc_io_member
+     u_recvcounts3d(kcpu)=num2d*numlev_at_process_array(kcpu) 
+     if(kcpu == 1) then
+       u_displs3d(kcpu)=0
+     else
+       u_displs3d(kcpu)=u_displs3d(kcpu-1)+u_recvcounts3d(kcpu-1)
+     endif
+  enddo
+  num2d=(nx_res+1)*ny_res
+  do kcpu=1,numproc_io_member
+     v_recvcounts3d(kcpu)=num2d*numlev_at_process_array(kcpu) 
+     if(kcpu == 1) then
+       v_displs3d(kcpu)=0
+     else
+       v_displs3d(kcpu)=v_displs3d(kcpu-1)+v_recvcounts3d(kcpu-1)
+     endif
+  enddo
+   
+  loc_nlevs=numlev_at_process_array(iope+1)
+  kbgn_loc=rangelev_at_process_array(1,iope+1) 
+  kend_loc=rangelev_at_process_array(2,iope+1) 
+  if(loc_nlevs.ne. kend_loc-kbgn_loc+1) then 
+    write(6,*)'thinkdeb, something workong for loc_nlevs'
+    call stop2(23)
+  endif
+  
+  if(nanal <= nanals) then !  otherwise , not used,now all mpi processes should be used
+    if (ionumproc .ne.numproc_io_member) then
+       write(6,*)'ionumproc .ne.numproc_io_member , something wrong'
+    endif   
+    ! Define character string for ensemble member file
+    if (nanal > 0) then
+      write(charnanal,'(a3, i3.3)') 'mem', nanal
+    else
+      charnanal = 'ensmean'
+    endif
+    do ntile=1,ntiles
+      nn_tile0=(ntile-1)*nx_res*ny_res
+      write(char_tile, '(i1)') ntile
+
+      allocate(locworkvar3d(nx_res,ny_res,loc_nlevs))
+
+
+      filename = "fv3sar_tile"//char_tile//"_"//trim(charnanal)
+      if(l_fv3reg_filecombined) then
+         fv3filename=trim(adjustl(filename))//"_dynvartracer"
+         call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_nowrite,file_id, &
+                                  comm=local_mpi_world,info=MPI_INFO_NULL ),&
+                       myname_,'open: '//trim(adjustl(fv3filename)) )
+         call fv3lamfile%setupfile(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
+      else
+         fv3filename=trim(adjustl(filename))//"_dynvars"
+
+         call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_nowrite,file_id,&
+                                  comm=local_mpi_world,info=MPI_INFO_NULL ),&
+                      myname_,'open: '//trim(adjustl(fv3filename)) )
+         fv3filename1=trim(adjustl(filename))//"_tracer"
+         call nc_check( nf90_open(trim(adjustl(fv3filename1)),nf90_nowrite,file_id1,&
+                                  comm=local_mpi_world,info=MPI_INFO_NULL ),&
+                    myname_,'open: '//trim(adjustl(fv3filename1)) )
+         call fv3lamfile%setupfile(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename))  , &
+                                       fileid2=file_id1,fv3fn2=trim(adjustl(fv3filename1)) )
+
+      endif
+
+
+    !----------------------------------------------------------------------
+    ! read u-component
+
+    !----------------------------------------------------------------------
+    ! Update u and v variables (same for NMM and ARW)
+      
+      if (u_ind > 0) then
+        if (iope == 0) then 
+          allocate(uworkvar3d(nx_res,ny_res+1,nlevs))
+        else
+          allocate(uworkvar3d(1,1,nlevs))
+        endif
+        allocate(locuworkvar3d(nx_res,ny_res+1,loc_nlevs))
+        allocate(u2d(nx_res,ny_res+1))
+            
+        varstrname = 'u'
+        call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!cltorg        call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locuworkvar3d)
+        call nc_check( nf90_inq_varid(file_id,varstrname,VarId),& 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+        nzp1=nlevs+1
+        do klev=kbgn_loc, kend_loc
+          inative=nzp1-klev
+          startloc=(/1,1,inative/)
+          countloc=(/nx_res,ny_res+1,1/)
+          iret=nf90_get_var(file_id,VarId,u2d,start=startloc,count=countloc)
+          locuworkvar3d(:,:,klev-kbgn_loc+1)=u2d
+        enddo
+          call mpi_gatherv(locuworkvar3d, u_recvcounts3d(iope+1), mpi_real4, &
+                        uworkvar3d, u_recvcounts3d, u_displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+        if(iope == 0) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+           do k=1,nlevs
+               do j=1,ny_res
+                 do i=1,nx_res
+                    nn=nn_tile0+(j-1)*nx_res+i
+                    vargrid(nn,levels(u_ind-1)+k,nb,ne)=uworkvar3d(i,j,k) 
+                 enddo
+               enddo
+           enddo
+           do k = levels(u_ind-1)+1, levels(u_ind)
+             if (nproc .eq. 0)                                               &
+                  write(6,*) 'READFVregional : u ',                           &
+                      & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+           enddo
+
+        endif !iope == 0
+           deallocate(uworkvar3d,locuworkvar3d)
+           deallocate(u2d)
+       
+
+      endif
+
+      if (v_ind > 0) then
+        if(iope == 0 ) then 
+            allocate(vworkvar3d(nx_res+1,ny_res,nlevs))
+        else
+            allocate(vworkvar3d(1,1,nlevs))
+        endif
+        allocate(v2d(nx_res+1,ny_res))
+        allocate(locvworkvar3d(nx_res+1,ny_res,loc_nlevs))
+        varstrname = 'v'
+        call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+        call nc_check( nf90_inq_varid(file_id,varstrname,VarId),  & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+        nzp1=nlevs+1
+        do klev=kbgn_loc, kend_loc
+          inative=nzp1-klev
+          startloc=(/1,1,inative/)
+          countloc=(/nx_res+1,ny_res,1/)
+          iret=nf90_get_var(file_id,VarId,v2d,start=startloc,count=countloc)
+          locvworkvar3d(:,:,klev-kbgn_loc+1)=v2d
+        enddo
+          call mpi_gatherv(locvworkvar3d, v_recvcounts3d(iope+1), mpi_real4, &
+                        vworkvar3d, v_recvcounts3d, v_displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+        if(iope==0) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+         do k=1,nlevs
+           do j=1,ny_res
+             do i=1,nx_res
+                nn=nn_tile0+(j-1)*nx_res+i
+                vargrid(nn,levels(v_ind-1)+k,nb,ne)=vworkvar3d(i,j,k) 
+             enddo
+           enddo
+         enddo
+         do k = levels(v_ind-1)+1, levels(v_ind)
+           if (nproc .eq. 0)                                               &
+                 write(6,*) 'READFVregional : v ',                           &
+                     & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+         enddo
+        endif !iope ==0 
+         deallocate(vworkvar3d,v2d,locvworkvar3d)
+      endif !v_ind
+
+      if (w_ind > 0) then
+          varstrname = 'W'
+          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!clt          call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+        call nc_check( nf90_inq_varid(file_id,varstrname,VarId), & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+        nzp1=nlevs+1
+        do klev=kbgn_loc, kend_loc
+          inative=nzp1-klev
+          startloc=(/1,1,inative/)
+          countloc=(/nx_res,ny_res,1/)
+          iret=nf90_get_var(file_id,VarId,workvar2d,start=startloc,count=countloc)
+          locworkvar3d(:,:,klev-kbgn_loc+1)=workvar2d
+        enddo
+          call mpi_gatherv(locworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                        workvar3d, recvcounts3d, displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+          
+          if(iope==0) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+            do k=1,nlevs
+               do j=1,ny_res
+                 do i=1,nx_res
+                    nn=nn_tile0+(j-1)*nx_res+i
+                    vargrid(nn,levels(w_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+                 enddo
+               enddo
+            enddo
+            do k = levels(w_ind-1)+1, levels(w_ind)
+              if (nproc .eq. 0)                                               &
+                     write(6,*) 'READFVregional : w ',                           &
+                         & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+            enddo
+          endif !iope == 0 
+
+      endif
+
+      if (tv_ind > 0.or.tsen_ind > 0 ) then
+         if(iope == 0) then 
+             allocate(tsenworkvar3d(nx_res,ny_res,nlevs))
+         else
+             allocate(tsenworkvar3d(1,1,nlevs))
+         endif
+         allocate(loctsenworkvar3d(nx_res,ny_res,loc_nlevs))
+         allocate(loctvworkvar3d(nx_res,ny_res,loc_nlevs))
+         allocate(locqworkvar3d(nx_res,ny_res,loc_nlevs))
+      
+         varstrname = 'T'
+         call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!clt         call read_fv3_restart_data3d(varstrname,fv3filename,file_id,loctsenworkvar3d)
+        call nc_check( nf90_inq_varid(file_id,varstrname,VarId), & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+        nzp1=nlevs+1
+        do klev=kbgn_loc, kend_loc
+          inative=nzp1-klev
+          startloc=(/1,1,inative/)
+          countloc=(/nx_res,ny_res,1/)
+          iret=nf90_get_var(file_id,VarId,workvar2d,start=startloc,count=countloc)
+          loctsenworkvar3d(:,:,klev-kbgn_loc+1)=workvar2d
+        enddo
+          call mpi_gatherv(loctsenworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                        tsenworkvar3d, recvcounts3d, displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+         if(iope == 0)    write(6,*)'thinkdeb5542 min/max tsen ', minval(tsenworkvar3d), maxval(tsenworkvar3d)
+         varstrname = 'sphum'
+         call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!clt         call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locqworkvar3d)
+         call nc_check( nf90_inq_varid(file_id,varstrname,VarId) , &
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+         nzp1=nlevs+1
+         do klev=kbgn_loc, kend_loc
+           inative=nzp1-klev
+           startloc=(/1,1,inative/)
+           countloc=(/nx_res,ny_res,1/)
+           iret=nf90_get_var(file_id,VarId,workvar2d,start=startloc,count=countloc)
+           locqworkvar3d(:,:,klev-kbgn_loc+1)=workvar2d
+         enddo
+         if ( cliptracers ) then ! 
+              clip = tiny(locqworkvar3d(1,1,1))
+              where (locqworkvar3d < clip) locqworkvar3d = clip
+         end if
+         call mpi_gatherv(locqworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                        qworkvar3d, recvcounts3d, displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+
+
+         if(iope== 0) then
+            if (q_ind > 0) then
+                varstrname = 'sphum'
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         vargrid(nn,levels(q_ind-1)+k,nb,ne)=qworkvar3d(i,j,k) 
+                       enddo
+                    enddo
+                 enddo
+                 do k = levels(q_ind-1)+1, levels(q_ind)
+                    if (nproc .eq. 0)                                               &
+                         write(6,*) 'READFVregional : q ',                           &
+                              & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+                 enddo
+
+            endif
+            if(tv_ind > 0) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
+                do k=1,nlevs
+                  do j=1,ny_res
+                    do i=1,nx_res
+                      workvar3d(i,j,k)=tsenworkvar3d(i,j,k)*(one+fv*qworkvar3d(i,j,k))
+                    enddo
+                   enddo
+                 enddo
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
+             do k=1,nlevs
+                do j=1,ny_res
+                  do i=1,nx_res
+                    tvworkvar3d(i,j,k)=workvar3d(i,j,k)
+                  enddo
+                enddo
+              enddo 
+              write(6,*)'thinkdeb555 min/max tsen ', minval(tsenworkvar3d), maxval(tsenworkvar3d)
+            else! tsen_id >0
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
+                 do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                        workvar3d(i,j,k)=tsenworkvar3d(i,j,k)
+                      enddo
+                    enddo
+                  enddo
+            endif
+            tmp_ind=max(tv_ind,tsen_ind) !then can't be both >0 
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+            do k=1,nlevs
+                do j=1,ny_res
+                   do i=1,nx_res
+                       nn=nn_tile0+(j-1)*nx_res+i
+                       vargrid(nn,levels(tmp_ind-1)+k,nb,ne)=workvar3d(i,j,k) 
+                    enddo
+                 enddo
+            enddo
+            do k = levels(tmp_ind-1)+1, levels(tmp_ind)
+              if (nproc .eq. 0) then                                              
+                  write(6,*) 'READFVregional : t ',                           &
+                      & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+              endif
+            enddo
+         endif !iope == 0 
+
+      endif
+              
+
+       
+      if (oz_ind > 0) then
+          varstrname = 'o3mr'
+          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!cltorg          call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+          call nc_check( nf90_inq_varid(file_id,varstrname,VarId),& 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+          nzp1=nlevs+1
+          do klev=kbgn_loc, kend_loc
+            inative=nzp1-klev
+            startloc=(/1,1,inative/)
+            countloc=(/nx_res,ny_res,1/)
+            iret=nf90_get_var(file_id,VarId,workvar2d,start=startloc,count=countloc)
+            locworkvar3d(:,:,klev-kbgn_loc+1)=workvar2d
+          enddo
+          call mpi_gatherv(locworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                        workvar3d, recvcounts3d, displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+          if(iope ==0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+            do k=1,nlevs
+               do j=1,ny_res
+                 do i=1,nx_res
+                   nn=nn_tile0+(j-1)*nx_res+i
+                   vargrid(nn,levels(oz_ind-1)+k,nb,ne)=workvar3d(i,j,k) 
+                 enddo
+               enddo
+            enddo
+            do k = levels(oz_ind-1)+1, levels(oz_ind)
+                if (nproc .eq. 0)                                               &
+                   write(6,*) 'READFVregional : oz ',                           &
+                       & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+            enddo
+          endif
+
+      endif
+
+      if (ql_ind > 0) then
+          varstrname = 'liq_wat'
+          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!cltorg          call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+          call nc_check( nf90_inq_varid(file_id,varstrname,VarId), & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+          nzp1=nlevs+1
+          do klev=kbgn_loc, kend_loc
+            inative=nzp1-klev
+            startloc=(/1,1,inative/)
+            countloc=(/nx_res,ny_res,1/)
+            iret=nf90_get_var(file_id,VarId,workvar2d,start=startloc,count=countloc)
+            locworkvar3d(:,:,klev-kbgn_loc+1)=workvar2d
+          enddo
+          call mpi_gatherv(locworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                        workvar3d, recvcounts3d, displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+          if(iope==0) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+             do k=1,nlevs
+                do j=1,ny_res
+                  do i=1,nx_res
+                     nn=nn_tile0+(j-1)*nx_res+i
+                     vargrid(nn,levels(ql_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+                  enddo
+                enddo
+             enddo
+             do k = levels(ql_ind-1)+1, levels(ql_ind)
+                 if (nproc .eq. 0)                                               &
+                    write(6,*) 'READFVregional : ql ',                           &
+                        & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+             enddo
+          
+          endif !iope == 0 
+
+      endif
+
+      if (qi_ind > 0) then
+          varstrname = 'ice_wat'
+          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!cltorg          call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+          call nc_check( nf90_inq_varid(file_id,varstrname,VarId),  & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+          nzp1=nlevs+1
+          do klev=kbgn_loc, kend_loc
+            inative=nzp1-klev
+            startloc=(/1,1,inative/)
+            countloc=(/nx_res,ny_res,1/)
+            iret=nf90_get_var(file_id,VarId,workvar2d,start=startloc,count=countloc)
+            locworkvar3d(:,:,klev-kbgn_loc+1)=workvar2d
+          enddo
+          call mpi_gatherv(locworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                        workvar3d, recvcounts3d, displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+          if(iope ==0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+            do k=1,nlevs
+               do j=1,ny_res
+                 do i=1,nx_res
+                    nn=nn_tile0+(j-1)*nx_res+i
+                   vargrid(nn,levels(qi_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+                 enddo
+               enddo
+            enddo
+            do k = levels(qi_ind-1)+1, levels(qi_ind)
+                if (nproc .eq. 0)                                               &
+                   write(6,*) 'READFVregional : qi ',                           &
+                       & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+            enddo
+          endif !iope == 0 
+
+      endif
+
+      if (qr_ind > 0) then
+          varstrname = 'rainwat'
+          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!cltorg          call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+          call nc_check( nf90_inq_varid(file_id,varstrname,VarId),  & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+          nzp1=nlevs+1
+          do klev=kbgn_loc, kend_loc
+            inative=nzp1-klev
+            startloc=(/1,1,inative/)
+            countloc=(/nx_res,ny_res,1/)
+            iret=nf90_get_var(file_id,VarId,workvar2d,start=startloc,count=countloc)
+            locworkvar3d(:,:,klev-kbgn_loc+1)=workvar2d
+          enddo
+          call mpi_gatherv(locworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                        workvar3d, recvcounts3d, displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+          if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+            do k=1,nlevs
+               do j=1,ny_res
+                 do i=1,nx_res
+                    nn=nn_tile0+(j-1)*nx_res+i
+                    vargrid(nn,levels(qr_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+                 enddo
+              enddo
+            enddo
+            do k = levels(qr_ind-1)+1, levels(qr_ind)
+                if (nproc .eq. 0)                                               &
+                   write(6,*) 'READFVregional : qr ',                           &
+                       & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+            enddo
+          endif !iope == 0 
+
+      endif
+
+      if (qs_ind > 0) then
+          varstrname = 'snowwat'
+          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!cltorg          call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+          call nc_check( nf90_inq_varid(file_id,varstrname,VarId), & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+          nzp1=nlevs+1
+          do klev=kbgn_loc, kend_loc
+            inative=nzp1-klev
+            startloc=(/1,1,inative/)
+            countloc=(/nx_res,ny_res,1/)
+            iret=nf90_get_var(file_id,VarId,workvar2d,start=startloc,count=countloc)
+            locworkvar3d(:,:,klev-kbgn_loc+1)=workvar2d
+          enddo
+          call mpi_gatherv(locworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                        workvar3d, recvcounts3d, displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+          if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+            do k=1,nlevs
+               do j=1,ny_res
+                 do i=1,nx_res
+                    nn=nn_tile0+(j-1)*nx_res+i
+                    vargrid(nn,levels(qs_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+                 enddo
+               enddo
+            enddo
+            do k = levels(qs_ind-1)+1, levels(qs_ind)
+                if (nproc .eq. 0)                                               &
+                   write(6,*) 'READFVregional : qs ',                           &
+                       & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+            enddo
+
+          endif !iope == 0 
+      endif
+
+      if (qg_ind > 0) then
+          varstrname = 'graupel'
+          call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!cltorg tothink         call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+          call nc_check( nf90_inq_varid(file_id,varstrname,VarId), & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+          nzp1=nlevs+1
+          do klev=kbgn_loc, kend_loc
+            inative=nzp1-klev
+            startloc=(/1,1,inative/)
+            countloc=(/nx_res,ny_res,1/)
+            iret=nf90_get_var(file_id,VarId,workvar2d,start=startloc,count=countloc)
+            locworkvar3d(:,:,klev-kbgn_loc+1)=workvar2d
+          enddo
+          call mpi_gatherv(locworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                        workvar3d, recvcounts3d, displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+          if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+            do k=1,nlevs
+               nn = nn_tile0
+               do j=1,ny_res
+                 do i=1,nx_res
+                   nn=nn_tile0+(j-1)*nx_res+i
+                   vargrid(nn,levels(qg_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+                 enddo
+               enddo
+            enddo
+            do k = levels(qg_ind-1)+1, levels(qg_ind)
+                if (nproc .eq. 0)                                               &
+                   write(6,*) 'READFVregional : qg ',                           &
+                       & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+            enddo
+          endif !iope == 0 
+
+      endif
+
+      if (qnr_ind > 0) then
+         varstrname = 'rain_nc'
+         call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!cltorg         call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+          call nc_check( nf90_inq_varid(file_id,varstrname,VarId), & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+          nzp1=nlevs+1
+          do klev=kbgn_loc, kend_loc
+            inative=nzp1-klev
+            startloc=(/1,1,inative/)
+            countloc=(/nx_res,ny_res,1/)
+            iret=nf90_get_var(file_id,VarId,workvar2d,start=startloc,count=countloc)
+            locworkvar3d(:,:,klev-kbgn_loc+1)=workvar2d
+          enddo
+          call mpi_gatherv(locworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                        workvar3d, recvcounts3d, displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+         if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+           do k=1,nlevs
+              do j=1,ny_res
+                do i=1,nx_res
+                  nn=nn_tile0+(j-1)*nx_res+i
+                  vargrid(nn,levels(qnr_ind-1)+k,nb,ne)=workvar3d(i,j,k)
+                enddo
+              enddo
+           enddo
+           do k = levels(qnr_ind-1)+1, levels(qnr_ind)
+               if (nproc .eq. 0)                                               &
+                  write(6,*) 'READFVregional : qnr ',                           &
+                      & k, minval(vargrid(:,k,nb,ne)), maxval(vargrid(:,k,nb,ne))
+           enddo
+         endif !iope == 0 
+
+      endif
+     
+      ! set SST to zero for now
+      if (sst_ind > 0) then
+        if(iope == 0 ) then
+!clttodo
+          vargrid(:,levels(n3d)+sst_ind,nb,ne) = zero
+        endif !iope == 0 
+      endif
+
+
+      !----------------------------------------------------------------------
+      ! Allocate memory for variables computed within routine
+   
+      if (ps_ind > 0) then
+         if (iope ==0) then 
+           allocate(workprsi(nx_res,ny_res,nlevsp1))
+           allocate(pswork(nx_res,ny_res))
+         endif
+         varstrname="delp"
+         call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!cltorg         call read_fv3_restart_data3d('delp',fv3filename,file_id,locworkvar3d)  
+          call nc_check( nf90_inq_varid(file_id,varstrname,VarId), &
+                       myname_,'inq_varid '//trim(varstrname)//' '//trim(fv3filename) )
+          nzp1=nlevs+1
+          do klev=kbgn_loc, kend_loc
+            inative=nzp1-klev
+            startloc=(/1,1,inative/)
+            countloc=(/nx_res,ny_res,1/)
+            iret=nf90_get_var(file_id,VarId,workvar2d,start=startloc,count=countloc)
+            locworkvar3d(:,:,klev-kbgn_loc+1)=workvar2d
+          enddo
+          call mpi_gatherv(locworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                        workvar3d, recvcounts3d, displs3d,&
+                        mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+         if(iope == 0 ) then
+           workprsi(:,:,nlevsp1)=eta1_ll(nlevsp1) !etal_ll is needed
+           do i=nlevs,1,-1
+             workprsi(:,:,i)=workvar3d(:,:,i)*0.01_r_kind+workprsi(:,:,i+1)
+           enddo
+      
+           pswork(:,:)=workprsi(:,:,1)
+
+
+
+!$omp parallel do schedule(dynamic,1) private(j,i,nn)
+           do j=1,ny_res
+              do i=1,nx_res
+                 nn=nn_tile0+(j-1)*nx_res+i
+                 vargrid(nn,levels(n3d)+ps_ind, nb,ne) =pswork(i,j) 
+              enddo
+           enddo
+
+           if(nproc==0) then 
+                  write(6,*) 'READFVregional : ps ',                           &
+                      & k, minval(vargrid(:,levels(n3d)+ps_ind,nb,ne)), maxval(vargrid(:,levels(n3d)+ps_ind,nb,ne))
+
+           endif !nproc==0  
+           
+
+           
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
+           do k=1,nlevs
+             do j=1,ny_res  
+               do i=1,nx_res
+                 workvar3d(i,j,k)=(workprsi(i,j,k)+workprsi(i,j,k+1))*half
+               enddo
+             enddo
+           enddo
+           ice=.true.  
+           if (pseudo_rh) then
+              if (tv_ind.le.0) then 
+                write(6,*)' tvwork has not been cacluated , do it, now stop' 
+                call stop2(23)
+              endif
+                call genqsat1(qworkvar3d,qsatworkvar3d,workvar3d,tvworkvar3d,ice,  &
+                          nx_res*ny_res,nlevs)
+           else
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
+             do k=1,nlevs
+                do j=1,ny_res
+                   do i=1,nx_res
+                     qsatworkvar3d(i,j,k) = 1._r_double
+                    enddo
+                 enddo
+              enddo
+           endif
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+           do k=1,nlevs
+              do j=1,ny_res
+                do i=1,nx_res
+                  nn=nn_tile0+(j-1)*nx_res+i
+                  qsat(nn,k,nb,ne)=qsatworkvar3d(i,j,k) 
+                enddo
+              enddo
+           enddo
+                 
+               
+
+
+
+         endif !iope == 0 
+      endif
+      deallocate(workvar3d)
+      deallocate(qworkvar3d)
+      deallocate(qsatworkvar3d)
+      deallocate(tvworkvar3d)
+      deallocate(workvar2d)
+      deallocate(locworkvar3d)
+      deallocate(loctsenworkvar3d)
+      deallocate(loctvworkvar3d)
+      deallocate(locqworkvar3d)
+      if(iope == 0 ) then
+           write(6,*)'thinkdebxxx iope=0 ',nproc
+      endif
+      if(allocated(tsenworkvar3d)) deallocate(tsenworkvar3d)
+      if(allocated(qsatworkvar3d)) deallocate(qsatworkvar3d)
+      if(allocated(qworkvar3d)) deallocate(qworkvar3d)
+      if(allocated(tvworkvar3d)) deallocate(tvworkvar3d)
+      if(allocated(pswork))     deallocate(pswork)
+      if(allocated(workprsi))     deallocate(workprsi)
+      if(l_fv3reg_filecombined) then
+          call nc_check( nf90_close(file_id),&
+            myname_,'close '//trim(filename) )
+      else
+         do ifile=1,2
+           file_id=fv3lamfile%fv3lam_fileid(ifile)
+           filename=fv3lamfile%fv3lamfilename(ifile)
+           call nc_check( nf90_close(file_id),&
+               myname_,'close '//trim(filename) )
+         enddo
+      endif 
+      !======================================================================
+      ! Deallocate memory 
+
+
+   end do ! ntile loop
+  endif  ! nanal<= nanals 
+end subroutine readgriddata_pnc
+
+subroutine writegriddata_pnc(vars3d,vars2d,n3d,n2d,levels,ndim,vargrid,no_inflate_flag)
+    use constants, only: max_varname_length
+    use constants, only:zero,one,half,fv, max_varname_length
+    use params, only: nbackgrounds
+    use gridinfo,only: eta1_ll,eta2_ll    
+    use params, only: nbackgrounds, anlfileprefixes, fgfileprefixes
+    use params,   only: nx_res,ny_res,nlevs,ntiles,l_pres_add_saved
+    use netcdf, only: nf90_open,nf90_close,nf90_get_var,nf90_noerr
+    use netcdf, only: nf90_inq_dimid,nf90_inq_varid
+    use netcdf, only: nf90_write,nf90_write,nf90_inquire,nf90_inquire_dimension
+    use netcdf, only: nf90_put_var,nf90_get_var
+
+    implicit none
+    character(len=max_varname_length), dimension(n2d), intent(in) :: vars2d
+    character(len=max_varname_length), dimension(n3d), intent(in) :: vars3d
+    integer(i_kind), intent(in) :: n2d,n3d,ndim
+    integer(i_kind), dimension(0:n3d), intent(in) :: levels
+    real(r_single), dimension(npts,ndim,nbackgrounds,1), intent(inout) :: vargrid
+    character(len=24),parameter :: myname_ = 'fv3: writegriddata_pnc'
+    logical, intent(in) :: no_inflate_flag
+    character(len=500) :: filename
+    character(len=:),allocatable :: fv3filename,fv3filename1
+    character(len=7)   :: charnanal
+    integer(i_kind) file_id,file_id1
+    real(r_single), dimension(:,:,:), allocatable ::workvar3d,uworkvar3d,&
+                        vworkvar3d,tvworkvar3d,tsenworkvar3d,&
+                        workprsi,qworkvar3d,workinc3d,workinc3d2,locworkinc3d
+    real(r_single), dimension(:,:,:), allocatable ::locworkvar3d,locuworkvar3d,&
+                        locvworkvar3d,loctsenworkvar3d,loctvworkvar3d,&
+                        locqworkvar3d
+    real(r_single), dimension(:,:),allocatable :: loc2dsend,loc2drecv
+    real(r_single), dimension(:,:),allocatable :: workvar2d
+    real(r_double),dimension(:,:,:),allocatable:: qsatworkvar3d
+    real(r_single), dimension(:,:),   allocatable ::pswork
+    real(r_single),dimension(:,:), allocatable::u2d,v2d
+    real(r_single)              :: clip
+    integer(i_kind):: mpistatus(mpi_status_size)=0
+    integer(i_kind):: irequest
+    ! Define counting variables
+    character(len=12) :: varstrname
+    character(len=1) char_tile
+    integer (i_kind) :: VarId
+    integer(i_kind) :: nlevsp1
+    integer(i_kind) :: i,j,ii, k,nn,ntile,nn_tile0, nb,nanal,ne,iret,ierror
+    integer(i_kind) :: u_ind, v_ind, tv_ind,tsen_ind, q_ind, oz_ind
+    integer(i_kind) :: w_ind, ql_ind, qi_ind, qr_ind, qs_ind, qg_ind, qnr_ind
+    integer (i_kind):: ps_ind, sst_ind
+    integer (i_kind):: tmp_ind,ifile
+    logical :: ice
+    integer(i_kind) countloc(3),startloc(3)
+    integer(i_kind) :: nzp1,inative,ipe,isub,klev
+    logical ::  l_q_updated
+    
+    
+    write(6,*)"the no_inflate_flag is not used in the currrent implementation ",no_inflate_flag
+    !----------------------------------------------------------------------
+    nlevsp1=nlevs+1
+    u_ind   = getindex(vars3d, 'u')   !< indices in the state var arrays
+    v_ind   = getindex(vars3d, 'v')   ! U and V (3D)
+    tv_ind  = getindex(vars3d, 't')  ! Tv (3D)
+    tsen_ind  = getindex(vars3d, 'tsen')  ! Tv (3D)
+    q_ind   = getindex(vars3d, 'q')   ! Q (3D)
+    oz_ind  = getindex(vars3d, 'oz')  ! Oz (3D)
+    w_ind   = getindex(vars3d, 'w')   ! W for WRF-ARW
+
+    ql_ind  = getindex(vars3d, 'ql')  ! QL (3D) for FV3
+    qi_ind  = getindex(vars3d, 'qi')  ! QI (3D) for FV3
+    qr_ind  = getindex(vars3d, 'qr')  ! QR (3D) for FV3
+    qs_ind  = getindex(vars3d, 'qs')  ! QS (3D) for FV3
+    qg_ind  = getindex(vars3d, 'qg')  ! QG (3D) for FV3
+    qnr_ind  = getindex(vars3d, 'qnr')  ! QNR (3D) for FV3
+    
+    ps_ind  = getindex(vars2d, 'ps')  ! Ps (2D)
+
+
+    !----------------------------------------------------------------------
+    if (nbackgrounds > 1) then
+       write(6,*)'gridio/writegriddata: writing multiple backgrounds not yet supported'
+       call stop2(23)
+    endif
+    ne =1 
+    nanal = mem_pe(nproc)
+    if(nanal <=nanals) then
+      backgroundloop: do nb=1,nbackgrounds
+         allocate(workvar2d(nx_res,ny_res))
+         if(iope== 0) then
+           allocate(workinc3d(nx_res,ny_res,nlevs),workinc3d2(nx_res,ny_res,nlevsp1))
+           allocate(workvar3d(nx_res,ny_res,nlevs))
+           allocate(qworkvar3d(nx_res,ny_res,nlevs))
+           allocate(tvworkvar3d(nx_res,ny_res,nlevs))
+         else
+           allocate(workinc3d(1,1,nlevs),workinc3d2(1,1,nlevsp1))
+           allocate(workvar3d(1,1,nlevs))
+           allocate(qworkvar3d(1,1,nlevs))
+           allocate(tvworkvar3d(1,1,nlevs))
+         endif
+         allocate(locworkinc3d(nx_res,ny_res,loc_nlevs))
+         allocate(locworkvar3d(nx_res,ny_res,loc_nlevs))
+         allocate(loctvworkvar3d(nx_res,ny_res,loc_nlevs))
+         allocate(loctsenworkvar3d(nx_res,ny_res,loc_nlevs))
+         allocate(locqworkvar3d(nx_res,ny_res,loc_nlevs))
+
+          !----------------------------------------------------------------------
+          ! First guess file should be copied to analysis file at scripting
+          ! level; only variables updated by EnKF are changed
+         write(charnanal,'(a3, i3.3)') 'mem', nanal
+         do ntile=1,ntiles
+        
+           nn_tile0=(ntile-1)*nx_res*ny_res
+         ! Update u and v variables (same for NMM and ARW)
+           write(char_tile, '(i1)') ntile
+           filename = "fv3sar_tile"//char_tile//"_"//trim(charnanal)
+           if(l_fv3reg_filecombined) then
+              fv3filename=trim(adjustl(filename))//"_dynvartracer"
+              call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_write,file_id,&
+                                  comm=local_mpi_world,info=MPI_INFO_NULL ),&
+                         myname_,'open: '//trim(adjustl(fv3filename)) )
+              call fv3lamfile%setupfile(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename)))
+           else
+              fv3filename=trim(adjustl(filename))//"_dynvars"
+              call nc_check( nf90_open(trim(adjustl(fv3filename)),nf90_write,file_id,&
+                                  comm=local_mpi_world,info=MPI_INFO_NULL ),&
+                         myname_,'open: '//trim(adjustl(fv3filename)) )
+              fv3filename1=trim(adjustl(filename))//"_tracer"
+              call nc_check( nf90_open(trim(adjustl(fv3filename1)),nf90_write,file_id1,&
+                                  comm=local_mpi_world,info=MPI_INFO_NULL ),&
+                         myname_,'open: '//trim(adjustl(fv3filename1)) )
+              call fv3lamfile%setupfile(fileid1=file_id,fv3fn1=trim(adjustl(fv3filename))  , &
+                                            fileid2=file_id1,fv3fn2=trim(adjustl(fv3filename1)) )
+              
+           endif 
+
+
+         !----------------------------------------------------------------------
+         !u-component
+
+           if (u_ind > 0) then
+              varstrname = 'u'
+              if (iope == 0) then 
+                allocate(uworkvar3d(nx_res,ny_res+1,nlevs))
+              else
+                allocate(uworkvar3d(1,1,nlevs))
+              endif
+              allocate(locuworkvar3d(nx_res,ny_res+1,loc_nlevs))
+              allocate(u2d(nx_res,ny_res+1))
+               
+              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+              
+!clt              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locuworkvar3d)
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId), & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+              nzp1=nlevs+1
+              do klev=kbgn_loc, kend_loc
+                inative=nzp1-klev
+                startloc=(/1,1,inative/)
+                countloc=(/nx_res,ny_res+1,1/)
+                iret=nf90_get_var(file_id,VarId,u2d,start=startloc,count=countloc)
+                locuworkvar3d(:,:,klev-kbgn_loc+1)=u2d
+              enddo
+              if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         workinc3d(i,j,k)=vargrid(nn,levels(u_ind-1)+k,nb,ne) 
+                      enddo
+                   enddo
+                enddo
+              endif
+                 call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+               locuworkvar3d(:,1:ny_res,:)=locuworkvar3d(:,1:ny_res,:)+locworkinc3d
+               locuworkvar3d(:,ny_res+1,:)=locuworkvar3d(:,ny_res+1,:)+locworkinc3d(:,ny_res,:)
+
+!clt              call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locuworkvar3d)
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId), & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res,ny_res+1,1/)
+                 iret=nf90_put_var(file_id,VarId,locuworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+              deallocate(uworkvar3d,locuworkvar3d,u2d)
+
+          endif
+           if (v_ind > 0) then
+              varstrname = 'v'
+              if (iope == 0) then 
+                allocate(vworkvar3d(nx_res+1,ny_res,nlevs))
+              else
+                allocate(vworkvar3d(1,1,nlevs))
+              endif
+              allocate(locvworkvar3d(nx_res+1,ny_res,loc_nlevs))
+              allocate(v2d(nx_res+1,ny_res))
+               
+              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+              
+!clt              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locuworkvar3d)
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId) , &
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+              nzp1=nlevs+1
+              do klev=kbgn_loc, kend_loc
+                inative=nzp1-klev
+                startloc=(/1,1,inative/)
+                countloc=(/nx_res+1,ny_res,1/)
+                iret=nf90_get_var(file_id,VarId,v2d,start=startloc,count=countloc)
+                locvworkvar3d(:,:,klev-kbgn_loc+1)=v2d
+              enddo
+
+              if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         workinc3d(i,j,k)=vargrid(nn,levels(v_ind-1)+k,nb,ne) 
+                      enddo
+                   enddo
+                enddo
+              endif
+                 call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+               locvworkvar3d(1:nx_res,:,:)=locvworkvar3d(1:nx_res,:,:)+locworkinc3d
+               locvworkvar3d(nx_res+1,:,:)=locvworkvar3d(nx_res+1,:,:)+locworkinc3d(nx_res,:,:)
+
+!clt              call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locuworkvar3d)
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId),& 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res+1,ny_res,1/)
+                 iret=nf90_put_var(file_id,VarId,locvworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+              deallocate(vworkvar3d,locvworkvar3d,v2d)
+
+          endif
+
+
+           if (w_ind > 0) then
+              varstrname = 'W'
+               
+              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+              
+!clt              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locuworkvar3d)
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId),& 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+              nzp1=nlevs+1
+              do klev=kbgn_loc, kend_loc
+                inative=nzp1-klev
+                startloc=(/1,1,inative/)
+                countloc=(/nx_res,ny_res,1/)
+                iret=nf90_get_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+              enddo
+
+              if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         workinc3d(i,j,k)=vargrid(nn,levels(w_ind-1)+k,nb,ne) 
+                      enddo
+                   enddo
+                enddo
+              endif
+                 call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+               locworkvar3d(:,:,:)=locworkvar3d(:,:,:)+locworkinc3d
+
+!clt              call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locuworkvar3d)
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res,ny_res+1,1/)
+                 iret=nf90_put_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+
+
+           endif
+
+           if (tv_ind > 0.or.tsen_ind>0 ) then
+                
+              varstrname = 'T'
+              if(tsen_ind>0) then
+                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+ !clt               call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+                call nc_check( nf90_inq_varid(file_id,varstrname,VarId), & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+                nzp1=nlevs+1
+                do klev=kbgn_loc, kend_loc
+                  inative=nzp1-klev
+                  startloc=(/1,1,inative/)
+                  countloc=(/nx_res,ny_res,1/)
+                  iret=nf90_get_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+                enddo
+                if(iope ==0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                  do k=1,nlevs
+                     do j=1,ny_res
+                       do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         workinc3d(i,j,k)=vargrid(nn,levels(tsen_ind-1)+k,nb,ne) 
+                       enddo
+                     enddo
+                  enddo
+                endif
+                call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+                locworkvar3d(:,:,:)=locworkvar3d(:,:,:)+locworkinc3d
+   
+!clt                call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+                
+                call nc_check( nf90_inq_varid(file_id,varstrname,VarId) ,&
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+                 nzp1=nlevs+1
+                 do klev=kbgn_loc, kend_loc
+                   inative=nzp1-klev
+                   startloc=(/1,1,inative/)
+                   countloc=(/nx_res,ny_res,1/)
+                   iret=nf90_put_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+                 enddo
+              else  ! tv_ind >0  
+                if(iope ==0) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                  do k=1,nlevs
+                    do j=1,ny_res
+                      do i=1,nx_res
+                        nn=nn_tile0+(j-1)*nx_res+i
+                        workinc3d(i,j,k)=vargrid(nn,levels(tv_ind-1)+k,nb,ne) 
+                      enddo
+                    enddo
+                   enddo
+                endif
+                call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+                
+
+                varstrname = 'T'
+                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+                call nc_check( nf90_inq_varid(file_id,varstrname,VarId) ,&
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+!cltorg call read_fv3_restart_data3d(varstrname,fv3filename,file_id,loctsenworkvar3d)
+                nzp1=nlevs+1
+                do klev=kbgn_loc, kend_loc
+                  inative=nzp1-klev
+                  startloc=(/1,1,inative/)
+                  countloc=(/nx_res,ny_res,1/)
+                  iret=nf90_get_var(file_id,VarId,loctsenworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+                enddo
+                 
+                varstrname = 'sphum'
+                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+                call nc_check( nf90_inq_varid(file_id,varstrname,VarId) ,&
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+!clt                call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locqworkvar3d)
+       
+                nzp1=nlevs+1
+                do klev=kbgn_loc, kend_loc
+                  inative=nzp1-klev
+                  startloc=(/1,1,inative/)
+                  countloc=(/nx_res,ny_res,1/)
+                  iret=nf90_get_var(file_id,VarId,locqworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+                enddo
+                if ( cliptracers ) then ! 
+                   clip = tiny(locqworkvar3d(1,1,1))
+                   where (locqworkvar3d < clip) locqworkvar3d = clip
+                end if
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
+                 do k=1,loc_nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                        loctvworkvar3d(i,j,k)=loctsenworkvar3d(i,j,k)*(one+fv*locqworkvar3d(i,j,k))
+                      enddo
+                    enddo
+                  enddo
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
+                  do k=1,loc_nlevs
+                    do j=1,ny_res
+                      do i=1,nx_res
+                        loctvworkvar3d(i,j,k)=loctvworkvar3d(i,j,k)+locworkinc3d(i,j,k)
+                      enddo
+                    enddo
+                  enddo
+                  if(q_ind > 0) then
+                   
+                   l_q_updated=.true.
+                   if(iope==0) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                     do k=1,nlevs
+                       do j=1,ny_res
+                         do i=1,nx_res
+                           nn=nn_tile0+(j-1)*nx_res+i
+                           workinc3d(i,j,k)=vargrid(nn,levels(q_ind-1)+k,nb,ne) 
+                         enddo
+                       enddo
+                     enddo
+                   endif
+                    call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
+                     do k=1,loc_nlevs
+                        do j=1,ny_res
+                        do i=1,nx_res
+                          locqworkvar3d(i,j,k)=locqworkvar3d(i,j,k)+locworkinc3d(i,j,k)
+                        enddo
+                        enddo
+                     enddo
+                  endif
+!$omp parallel do schedule(dynamic,1) private(k,j,i)
+                  do k=1,loc_nlevs
+                    do j=1,ny_res
+                      do i=1,nx_res
+                         loctsenworkvar3d(i,j,k)=loctvworkvar3d(i,j,k)/(one+fv*locqworkvar3d(i,j,k))
+                      enddo
+                    enddo
+                  enddo
+                endif
+                varstrname = 'T'
+                call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!clt                call write_fv3_restart_data3d(varstrname,fv3filename,file_id,loctsenworkvar3d)
+               call nc_check( nf90_inq_varid(file_id,varstrname,VarId) ,&
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res,ny_res,1/)
+                 iret=nf90_put_var(file_id,VarId,loctsenworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+                if(iope == 0) then
+                   do k=1,loc_nlevs
+                      if (nproc .eq. 0)                                               &
+                         write(6,*) 'WRITEregional : T ',                           &
+                             & k, minval(loctsenworkvar3d(:,:,k)), maxval(loctsenworkvar3d(:,:,k))
+                   enddo
+                endif
+
+
+
+                
+              endif !tv_ind / tsne_ind
+
+                if(q_ind>0) then
+                  varstrname='sphum'
+                
+                  call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!clt                  call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locqworkvar3d)
+                if(.not.l_q_updated) then 
+                     
+                   if(iope == 0 ) then
+     !$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                     do k=1,nlevs
+                        do j=1,ny_res
+                           do i=1,nx_res
+                              nn=nn_tile0+(j-1)*nx_res+i
+                              workinc3d(i,j,k)=vargrid(nn,levels(u_ind-1)+k,nb,ne) 
+                           enddo
+                        enddo
+                     enddo
+                   endif
+                      call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                           locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+                    
+                   call nc_check( nf90_inq_varid(file_id,varstrname,VarId), & 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+                   nzp1=nlevs+1
+                   do klev=kbgn_loc, kend_loc
+                     inative=nzp1-klev
+                     startloc=(/1,1,inative/)
+                     countloc=(/nx_res,ny_res,1/)
+                     iret=nf90_get_var(file_id,VarId,locqworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+                   enddo
+                   if ( cliptracers ) then ! 
+                     clip = tiny(locqworkvar3d(1,1,1))
+                     where (locqworkvar3d < clip) locqworkvar3d = clip
+                   end if
+                   locqworkvar3d=locqworkvar3d+locworkinc3d
+
+                 endif
+                if (  cliptracers ) then ! set cliptracers to remove negative hydrometers
+                     clip = tiny(locqworkvar3d(1,1,1))
+                     where (locqworkvar3d < clip) locqworkvar3d = clip
+                end if
+!cclt two times of clipping are done in the above. It is because
+!clt  the clipping is done when the background q is read in 
+!clt, so this clipping is maintained . 
+
+
+                 call nc_check( nf90_inq_varid(file_id,varstrname,VarId) ,&
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+                 nzp1=nlevs+1
+                 do klev=kbgn_loc, kend_loc
+                   inative=nzp1-klev
+                   startloc=(/1,1,inative/)
+                   countloc=(/nx_res,ny_res,1/)
+                   iret=nf90_put_var(file_id,VarId,locqworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+                 enddo
+                   
+                endif !q_ind
+           if (oz_ind > 0) then
+              varstrname = 'o3mr'
+                
+              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!clt call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId),& 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+              nzp1=nlevs+1
+              do klev=kbgn_loc, kend_loc
+                inative=nzp1-klev
+                startloc=(/1,1,inative/)
+                countloc=(/nx_res,ny_res,1/)
+                iret=nf90_get_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+              enddo
+
+              if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         workinc3d(i,j,k)=vargrid(nn,levels(oz_ind-1)+k,nb,ne) 
+                      enddo
+                   enddo
+                enddo
+              endif
+               call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+               locworkvar3d(:,:,:)=locworkvar3d(:,:,:)+locworkinc3d
+!cltorg               call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res,ny_res+1,1/)
+                 iret=nf90_put_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+
+           endif
+
+           if (ql_ind > 0) then
+              varstrname = 'liq_wat'
+              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!cltorg              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+               
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId) ,&
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+              nzp1=nlevs+1
+              do klev=kbgn_loc, kend_loc
+                inative=nzp1-klev
+                startloc=(/1,1,inative/)
+                countloc=(/nx_res,ny_res,1/)
+                iret=nf90_get_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+              enddo
+
+              if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         workinc3d(i,j,k)=vargrid(nn,levels(ql_ind-1)+k,nb,ne) 
+                      enddo
+                   enddo
+                enddo
+              endif
+                 call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+               locworkvar3d(:,:,:)=locworkvar3d(:,:,:)+locworkinc3d
+                if (  cliptracers ) then ! set cliptracers to remove negative hydrometers
+                     clip = tiny(locworkvar3d(1,1,1))
+                     where (locworkvar3d < clip) locworkvar3d = clip
+                end if
+!clt call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res,ny_res+1,1/)
+                 iret=nf90_put_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+
+           endif
+
+           if (qi_ind > 0) then
+              varstrname = 'ice_wat'
+
+              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!clt              call read_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId),& 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+              nzp1=nlevs+1
+              do klev=kbgn_loc, kend_loc
+                inative=nzp1-klev
+                startloc=(/1,1,inative/)
+                countloc=(/nx_res,ny_res,1/)
+                iret=nf90_get_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+              enddo
+
+              if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         workinc3d(i,j,k)=vargrid(nn,levels(qi_ind-1)+k,nb,ne) 
+                      enddo
+                   enddo
+                enddo
+               endif
+                 call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+                  locworkvar3d(:,:,:)=locworkvar3d(:,:,:)+locworkinc3d
+                 if ( cliptracers ) then ! set cliptracers to remove negative hydrometers
+                     clip = tiny(locworkvar3d(1,1,1))
+                     where (locworkvar3d < clip) locworkvar3d = clip
+                 end if
+!clt              call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res,ny_res,1/)
+                 iret=nf90_put_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+
+           endif
+
+           if (qr_ind > 0) then
+              varstrname = 'rainwat'
+
+              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId),& 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+              nzp1=nlevs+1
+              do klev=kbgn_loc, kend_loc
+                inative=nzp1-klev
+                startloc=(/1,1,inative/)
+                countloc=(/nx_res,ny_res,1/)
+                iret=nf90_get_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+              enddo
+
+              if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         workinc3d(i,j,k)=vargrid(nn,levels(qr_ind-1)+k,nb,ne) 
+                      enddo
+                   enddo
+                enddo
+              endif
+                 call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+                  locworkvar3d(:,:,:)=locworkvar3d(:,:,:)+locworkinc3d
+                 if ( cliptracers ) then ! set cliptracers to remove negative hydrometers
+                     clip = tiny(locworkvar3d(1,1,1))
+                     where (locworkvar3d < clip) locworkvar3d = clip
+                 end if
+!clt              call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res,ny_res+1,1/)
+                 iret=nf90_put_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+
+           endif
+
+           if (qs_ind > 0) then
+              varstrname = 'snowwat'
+
+              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId),& 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+              nzp1=nlevs+1
+              do klev=kbgn_loc, kend_loc
+                inative=nzp1-klev
+                startloc=(/1,1,inative/)
+                countloc=(/nx_res,ny_res,1/)
+                iret=nf90_get_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+              enddo
+
+              if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         workinc3d(i,j,k)=vargrid(nn,levels(qs_ind-1)+k,nb,ne) 
+                      enddo
+                   enddo
+                enddo
+              endif
+                 call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+                  locworkvar3d(:,:,:)=locworkvar3d(:,:,:)+locworkinc3d
+                 if ( cliptracers ) then ! set cliptracers to remove negative hydrometers
+                     clip = tiny(locworkvar3d(1,1,1))
+                     where (locworkvar3d < clip) locworkvar3d = clip
+                 end if
+!clt              call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res,ny_res+1,1/)
+                 iret=nf90_put_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+           endif
+
+           if (qg_ind > 0) then
+              varstrname = 'graupel'
+
+              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId),& 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+              nzp1=nlevs+1
+              do klev=kbgn_loc, kend_loc
+                inative=nzp1-klev
+                startloc=(/1,1,inative/)
+                countloc=(/nx_res,ny_res,1/)
+                iret=nf90_get_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+              enddo
+
+              if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         workinc3d(i,j,k)=vargrid(nn,levels(qg_ind-1)+k,nb,ne) 
+                      enddo
+                   enddo
+                enddo
+              endif
+                 call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+                  locworkvar3d(:,:,:)=locworkvar3d(:,:,:)+locworkinc3d
+                 if ( cliptracers ) then ! set cliptracers to remove negative hydrometers
+                     clip = tiny(locworkvar3d(1,1,1))
+                     where (locworkvar3d < clip) locworkvar3d = clip
+                 end if
+!clt              call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res,ny_res+1,1/)
+                 iret=nf90_put_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+
+           endif
+
+           if (qnr_ind > 0) then
+              varstrname = 'rain_nc'
+              call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId),& 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+              nzp1=nlevs+1
+              do klev=kbgn_loc, kend_loc
+                inative=nzp1-klev
+                startloc=(/1,1,inative/)
+                countloc=(/nx_res,ny_res,1/)
+                iret=nf90_get_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+              enddo
+
+              if(iope == 0 ) then
+!$omp parallel do schedule(dynamic,1) private(k,j,i,nn)
+                do k=1,nlevs
+                   do j=1,ny_res
+                      do i=1,nx_res
+                         nn=nn_tile0+(j-1)*nx_res+i
+                         workinc3d(i,j,k)=vargrid(nn,levels(qnr_ind-1)+k,nb,ne) 
+                      enddo
+                   enddo
+                enddo
+              endif
+                 call mpi_scatterv(workinc3d,recvcounts3d,displs3d,mpi_real4,&
+                      locworkinc3d(:,:,:),recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+                  locworkvar3d(:,:,:)=locworkvar3d(:,:,:)+locworkinc3d
+                 if ( cliptracers ) then ! set cliptracers to remove negative hydrometers
+                     clip = tiny(locworkvar3d(1,1,1))
+                     where (locworkvar3d < clip) locworkvar3d = clip
+                 end if
+!clt              call write_fv3_restart_data3d(varstrname,fv3filename,file_id,locworkvar3d)
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res,ny_res+1,1/)
+                 iret=nf90_put_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+           endif
+     
+           if (ps_ind > 0) then
+             if(iope == 0)   allocate(workprsi(nx_res,ny_res,nlevsp1))
+             if(iope == 0)   allocate(pswork(nx_res,ny_res))
+             varstrname = 'delp'
+             call fv3lamfile%get_idfn(varstrname,file_id,fv3filename)
+!clt             call read_fv3_restart_data3d(varstrname,filename,file_id,locworkvar3d)   ! Pascal
+
+
+              call nc_check( nf90_inq_varid(file_id,varstrname,VarId),& 
+                       myname_,'inq_varid '//trim(adjustl(varstrname))//' '//trim(fv3filename) )
+              nzp1=nlevs+1
+              do klev=kbgn_loc, kend_loc
+                inative=nzp1-klev
+                startloc=(/1,1,inative/)
+                countloc=(/nx_res,ny_res,1/)
+                iret=nf90_get_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+              enddo
+
+                call mpi_gatherv(locworkvar3d, recvcounts3d(iope+1), mpi_real4, &
+                          workvar3d, recvcounts3d, displs3d,&
+                          mpi_real4, 0,iocomms(mem_pe(nproc)) ,iret)
+             if(iope == 0 ) then
+                workprsi(:,:,nlevsp1)=eta1_ll(nlevsp1) !etal_ll is needed
+                do i=nlevs,1,-1
+                   workprsi(:,:,i)=workvar3d(:,:,i)*0.01_r_kind+workprsi(:,:,i+1)
+                enddo
+
+                nn = nn_tile0
+                do j=1,ny_res
+                  do i=1,nx_res
+                     nn=nn+1
+                     pswork(i,j)=vargrid(nn,levels(n3d)+ps_ind,nb,ne)
+                  enddo
+                enddo
+                if(l_pres_add_saved) then
+                  do k=1,nlevs+1
+                    do j=1,ny_res
+                      do i=1,nx_res
+                        workinc3d2(i,j,k)=eta2_ll(k)*pswork(i,j)
+                      enddo
+                    enddo
+                  enddo
+                  workprsi=workprsi+workinc3d2
+                else
+                    workprsi(:,:,1)=workprsi(:,:,1)+pswork
+                    do k=2,nlevsp1
+                       workprsi(:,:,k)=eta1_ll(k)+eta2_ll(k)*workprsi(:,:,1)
+                    enddo
+                endif
+                do k=1,nlevs
+                  workvar3d(:,:,k)=(workprsi(:,:,k)-workprsi(:,:,k+1))*100.0_r_kind
+                enddo
+              endif !iope==0
+                 call mpi_scatterv(workvar3d,recvcounts3d,displs3d,mpi_real4,&
+                 locworkvar3d,recvcounts3d(iope+1),mpi_real4,0,iocomms(mem_pe(nproc)),ierror)
+               nzp1=nlevs+1
+               do klev=kbgn_loc, kend_loc
+                 inative=nzp1-klev
+                 startloc=(/1,1,inative/)
+                 countloc=(/nx_res,ny_res,1/)
+                 iret=nf90_put_var(file_id,VarId,locworkvar3d(:,:,klev-kbgn_loc+1),start=startloc,count=countloc)
+               enddo
+
+
+           end if
+
+        
+           if(l_fv3reg_filecombined) then
+               call nc_check( nf90_close(file_id),&
+                 myname_,'close '//trim(filename) )
+           else
+              do ifile=1,2
+                file_id=fv3lamfile%fv3lam_fileid(ifile)
+                filename=fv3lamfile%fv3lamfilename(ifile)
+                call nc_check( nf90_close(file_id),&
+                   myname_,'close '//trim(filename) )
+              enddo
+           endif 
+
+
+         end do ! ntile   
+         if(allocated(workinc3d))     deallocate(workinc3d)
+         if(allocated(workinc3d2))     deallocate(workinc3d2)
+         if(allocated(workprsi))     deallocate(workprsi)
+         if(allocated(pswork))     deallocate(pswork)
+         if(allocated(tvworkvar3d)) deallocate(tvworkvar3d)
+         if(allocated(qworkvar3d)) deallocate(qworkvar3d)
+         if(allocated(workvar3d)) deallocate(workvar3d)
+         if(allocated(workvar2d)) deallocate(workvar2d)
+         deallocate(locworkinc3d)
+         deallocate(locworkvar3d)
+         deallocate(loctvworkvar3d)
+         deallocate(loctsenworkvar3d)
+         deallocate(locqworkvar3d)
+
+
+
+      end do backgroundloop ! loop over backgrounds to read in
+    endif  ! nanal<= nanals 
+
+    ! Return calculated values
+    return
+end subroutine writegriddata_pnc
+#endif  !# FV3_LAM_ON_SUBDOMAIN
 subroutine type_bound_setupfile(this,fileid1,fv3fn1,fileid2,fv3fn2,fileid3,fv3fn3)
        implicit none
        class (type_fv3lamfile) :: this  
@@ -2893,6 +4707,25 @@ function ifindstrloc(str_array,strin)
            endif
          enddo
 end function ifindstrloc
+subroutine distribute_items(n, m, drawers)
+!clt modified from a chatgpt version
+  implicit none
+  integer(i_kind), intent(in) :: n, m  !n items to be distrubed into m drawers
+  integer, intent(out) :: drawers(m)
+  integer :: quotient, remainder, i
+
+  ! Calculate the quotient and remainder
+  quotient = n / m
+  remainder = mod(n, m)
+
+  ! Distribute the quotient evenly among the drawers
+  drawers = quotient
+
+  ! Distribute the remainder items one by one
+  do i = 1, remainder
+    drawers(i) = drawers(i) + 1
+  end do
+end subroutine distribute_items
 
 
 

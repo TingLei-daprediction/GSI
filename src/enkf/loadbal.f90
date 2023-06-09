@@ -384,10 +384,8 @@ if (real(numproc)*real(nanals_per_iotask)*real(npts_max)*real(ncdim) < 2_r_kind*
     enddo
     allocate(sendbuf(numproc*nanals_per_iotask*npts_max*ncdim))
     allocate(recvbuf(numproc*nanals_per_iotask*npts_max*ncdim))
-
     ! send and receive buffers.
     do nb=1,nbackgrounds ! loop over time levels in background
-    
       if (nproc <= ntasks_io-1) then
          ! fill up send buffer.
          do np=1,numproc
@@ -491,7 +489,6 @@ do nb=1,nbackgrounds
   end do
 end do
 !$omp end parallel do
-
 
 end subroutine scatter_chunks
 

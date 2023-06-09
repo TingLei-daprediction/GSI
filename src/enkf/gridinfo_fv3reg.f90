@@ -47,7 +47,7 @@ use mpisetup, only: nproc, mpi_integer, mpi_real4,mpi_status
 use mpimod, only: mpi_comm_world
 use params, only: datapath,nlevs,nlons,nlats,use_gfs_nemsio, fgfileprefixes, &
                   fv3fixpath, nx_res,ny_res, ntiles,l_fv3reg_filecombined,paranc, &
-                  fv3_io_layout_nx,fv3_io_layout_ny
+                  fv3_io_layout_nx,fv3_io_layout_ny,l_fv3sar_on_subdomain
           
 use kinds, only: r_kind, i_kind, r_double, r_single
 use constants, only: one,zero,pi,cp,rd,grav,rearth,max_varname_length
@@ -178,7 +178,7 @@ if(nproc.eq.0) then
   ii=0
   do j=1,fv3_io_layout_ny
     do i=1,fv3_io_layout_nx
-      if(paranc) then
+      if(paranc.and.l_fv3sar_on_subdomain) then
         write(strsubid,'(a,I4.4)')'.',ii
       else
         strsubid=""
@@ -308,7 +308,7 @@ if(any (mpi_id_group == nproc))  then ! if paranc=.fales., this equal to "nproc=
      i=ij_pe(1,nproc)
      j=ij_pe(2,nproc)
      ii=(j-1)*fv3_io_layout_nx+i-1 
-     if(paranc) then
+     if(paranc.and.l_fv3sar_on_subdomain) then
        write(strsubid,'(a,I4.4)')'.',ii
      else
        strsubid=""
@@ -321,7 +321,7 @@ if(any (mpi_id_group == nproc))  then ! if paranc=.fales., this equal to "nproc=
      call read_fv3_restart_data2d('grid_latt',filename,file_id,loclat_tile)
      call nc_check( nf90_close(file_id),&
      myname_,'close '//trim(filename) )
-     if(paranc) then
+     if(paranc.and.l_fv3sar_on_subdomain) then
         call mpi_gatherv(loclat_tile, recvcounts2d(nproc+1), mpi_real4, lat_tile, recvcounts2d, displs2d,&
                 mpi_real4, 0,mpi_comm_userread ,ierror)
         call mpi_gatherv(loclon_tile, recvcounts2d(nproc+1), mpi_real4, lon_tile, recvcounts2d, displs2d,&
@@ -376,7 +376,7 @@ if(any (mpi_id_group == nproc))  then ! if paranc=.fales., this equal to "nproc=
      allocate(delploc(nxloc,nyloc,nlevs))
      ii=(j-1)*fv3_io_layout_nx+i-1 
 
-     if (paranc ) then
+     if (paranc.and.l_fv3sar_on_subdomain ) then
           write(strsubid,'(a,I4.4)')'.',ii
      else
           strsubid=""
@@ -391,7 +391,7 @@ if(any (mpi_id_group == nproc))  then ! if paranc=.fales., this equal to "nproc=
      call read_fv3_restart_data3d('delp',filename,file_id,delploc)
      call nc_check( nf90_close(file_id),&
      myname_,'close '//trim(filename) )
-     if(paranc) then
+     if(paranc.and.l_fv3sar_on_subdomain) then
        do k=1,nlevs
           call mpi_gatherv(delploc(:,:,k), recvcounts2d(nproc+1), mpi_real4, delp(:,:,k), recvcounts2d, displs2d,&
                       mpi_real4, 0,mpi_comm_userread ,ierror)
@@ -466,8 +466,9 @@ if (nproc .ne. 0) then
    allocate(eta1_ll(nlevsp1),eta2_ll(nlevsp1))
 endif
 if(nproc==0) write(6,*)logp(1,:)
+write(6,*)'thinkdeb npts is ',npts
 do k=1,nlevs_pres
-  call mpi_bcast(logp(1,k),npts,mpi_real4,0,MPI_COMM_WORLD,ierr)
+  call mpi_bcast(logp(1:,k),npts,mpi_real4,0,MPI_COMM_WORLD,ierr)
 enddo
 call mpi_bcast(lonsgrd,npts,mpi_real4,0,MPI_COMM_WORLD,ierr)
 call mpi_bcast(latsgrd,npts,mpi_real4,0,MPI_COMM_WORLD,ierr)

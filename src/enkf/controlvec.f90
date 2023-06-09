@@ -223,8 +223,6 @@ if (nproc <= ntasks_io-1) then
       call readgriddata(nanal1(nproc),nanal2(nproc),cvars3d,cvars2d,nc3d,nc2d,clevels,ncdim,nbackgrounds, &
            fgfileprefixes,fgsfcfileprefixes,reducedgrid,grdin,qsat)
    end if
-   call mpi_barrier(mpi_comm_world,ierr)
-   write(6,*)'thinkdeb min/max qsat','=',minval(qsat),maxval(qsat)
    if (use_qsatensmean) then
        allocate(qsatmean(npts,nlevs,nbackgrounds))
        allocate(qsat_tmp(npts))

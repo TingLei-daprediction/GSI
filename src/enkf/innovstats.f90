@@ -213,7 +213,7 @@ if (nobs_conv+nobs_oz > 0) then
    call printstats('  all gps',sumgps_nh,biasq_nh,sumgps_spread_nh,sumgps_oberr_nh,nobsgps_nh,&
         sumgps_sh,biasgps_sh,sumgps_spread_sh,sumgps_oberr_sh,nobsgps_sh,&
         sumgps_tr,biasgps_tr,sumgps_spread_tr,sumgps_oberr_tr,nobsgps_tr)
-   call printstats('  all dbz',sumdbz_nh,biasq_nh,sumdbz_spread_nh,sumdbz_oberr_nh,nobsdbz_nh,&
+   call printstats('  all dbz',sumdbz_nh,biasdbz_nh,sumdbz_spread_nh,sumdbz_oberr_nh,nobsdbz_nh,&
         sumdbz_sh,biasdbz_sh,sumdbz_spread_sh,sumdbz_oberr_sh,nobsdbz_sh,&
         sumdbz_tr,biasdbz_tr,sumdbz_spread_tr,sumdbz_oberr_tr,nobsdbz_tr)
    call printstats('  all  rw',sumrw_nh,biasq_nh,sumrw_spread_nh,sumrw_oberr_nh,nobsrw_nh,&
@@ -339,6 +339,10 @@ subroutine printstats(obtype,sum_nh,bias_nh,sum_spread_nh,sum_oberr_nh,nobs_nh,&
   if (nobs_nh > 0) then
      denom=one/real(nobs_nh,r_single)
      sum_nh = sum_nh*denom
+     write(6,*)'thinkdeb denmor is ',denom
+     call flush(6)
+     write(6,*)'thinkdeb bias_nh is ',bias_nh
+     call flush(6)
      bias_nh = bias_nh*denom
      sum_oberr_nh = sum_oberr_nh*denom
      sum_spread_nh = sum_spread_nh*denom
