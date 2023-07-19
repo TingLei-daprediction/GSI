@@ -368,6 +368,8 @@ if (nproc <= ntasks_io-1) then
          enddo
       endif
    end if
+   write(6,*)'thinkdeb222 before writegrid,paranc ',paranc
+   call flush(6)
    if (.not. paranc) then
       if (write_fv3_incr) then
          call writeincrement(nanal1(nproc),nanal2(nproc),cvars3d,cvars2d,nc3d,nc2d,clevels,ncdim,grdin,no_inflate_flag)
@@ -397,6 +399,8 @@ if (paranc) then
    else
       call writegriddata_pnc(cvars3d,cvars2d,nc3d,nc2d,clevels,ncdim,grdin,no_inflate_flag)
    end if
+   write(6,*)'thinkdeb333 after write_pnc'
+   call flush(6)
    if (nproc == 0) then
      ! also write out ens mean on root task
      if (write_ensmean) then ! FIXME use parallel IO to write ensmean

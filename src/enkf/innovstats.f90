@@ -346,7 +346,7 @@ subroutine printstats(obtype,sum_nh,bias_nh,sum_spread_nh,sum_oberr_nh,nobs_nh,&
      bias_nh = bias_nh*denom
      sum_oberr_nh = sum_oberr_nh*denom
      sum_spread_nh = sum_spread_nh*denom
-     write(6,9805) &
+     write(6,*) &
      'NH',obtype,nobs_nh,bias_nh,sqrt(sum_nh),sqrt(sum_spread_nh+sum_oberr_nh),sqrt(sum_spread_nh),sqrt(sum_oberr_nh)
   end if
   if (nobs_tr > 0) then
