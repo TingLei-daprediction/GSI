@@ -2263,7 +2263,7 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin)
     character(*),intent(in):: filenamein
     type (type_fv3regfilenameg),intent(in) ::fv3filenamegin
     real(r_kind),allocatable,dimension(:,:):: uu2d
-    real(r_kind),dimension(1,grd_ionouv%nlat,grd_ionouv%nlon,grd_ionouv%kbegin_loc:grd_ionouv%kend_alloc):: hwork
+    real(r_kind),allocatable:: hwork(:,:,:,:) 
     character(len=max_varname_length) :: varname,vgsiname
     character(len=max_varname_length) :: name
     character(len=max_filename_length) :: filenamein2
@@ -2286,6 +2286,8 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin)
     integer(i_kind) :: nio
     integer(i_kind),allocatable :: gfile_loc_layout(:)
     character(len=180)  :: filename_layout
+
+    allocate(hwork(1,grd_ionouv%nlat,grd_ionouv%nlon,grd_ionouv%kbegin_loc:grd_ionouv%kend_alloc))
 
     mm1=mype+1
     nloncase=grd_ionouv%nlon
@@ -2419,7 +2421,7 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin)
        
     deallocate (uu2d)
     call general_grid2sub(grd_ionouv,hwork,cstate_nouv%values)
-    
+    deallocate(hwork) 
     return
   end subroutine gsi_fv3ncdf_read
 
@@ -2468,7 +2470,7 @@ subroutine gsi_fv3ncdf_read_v1(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin)
     type (type_fv3regfilenameg) :: fv3filenamegin
     type(gsi_bundle),intent(inout) :: cstate_nouv
     real(r_kind),allocatable,dimension(:,:):: uu2d
-    real(r_kind),dimension(1,grd_ionouv%nlat,grd_ionouv%nlon,grd_ionouv%kbegin_loc:grd_ionouv%kend_alloc):: hwork
+    real(r_kind),allocatable:: hwork(:,:,:,:)
     character(len=max_filename_length) :: filenamein2
     character(len=max_varname_length) :: varname,vgsiname
 
@@ -2481,6 +2483,8 @@ subroutine gsi_fv3ncdf_read_v1(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin)
     integer(i_kind) nzp1,mm1
 
     mm1=mype+1
+
+    allocate(hwork(1,grd_ionouv%nlat,grd_ionouv%nlon,grd_ionouv%kbegin_loc:grd_ionouv%kend_alloc))
 
     nloncase=grd_ionouv%nlon
     nlatcase=grd_ionouv%nlat
@@ -2526,6 +2530,7 @@ subroutine gsi_fv3ncdf_read_v1(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin)
     iret=nf90_close(gfile_loc)
 
     deallocate (uu2d)
+    deallocate(hwork)
 
 
     return
@@ -2566,7 +2571,7 @@ subroutine gsi_fv3ncdf_readuv(grd_uv,ges_u,ges_v,fv3filenamegin)
     real(r_kind),dimension(grd_uv%lat2,grd_uv%lon2,grd_uv%nsig),intent(inout)::ges_u
     real(r_kind),dimension(grd_uv%lat2,grd_uv%lon2,grd_uv%nsig),intent(inout)::ges_v
     type (type_fv3regfilenameg),intent (in) :: fv3filenamegin
-    real(r_kind),dimension(2,grd_uv%nlat,grd_uv%nlon,grd_uv%kbegin_loc:grd_uv%kend_alloc):: hwork
+    real(r_kind),allocatable:: hwork(:,:,:,:)
     character(:), allocatable:: filenamein
     real(r_kind),allocatable,dimension(:,:):: u2d,v2d
     real(r_kind),allocatable,dimension(:,:):: uc2d,vc2d
@@ -2593,6 +2598,7 @@ subroutine gsi_fv3ncdf_readuv(grd_uv,ges_u,ges_v,fv3filenamegin)
     integer(i_kind),allocatable :: gfile_loc_layout(:)
     character(len=180)  :: filename_layout
 
+    allocate(hwork(2,grd_uv%nlat,grd_uv%nlon,grd_uv%kbegin_loc:grd_uv%kend_alloc))
     mm1=mype+1
     nloncase=grd_uv%nlon
     nlatcase=grd_uv%nlat
@@ -2732,6 +2738,7 @@ subroutine gsi_fv3ncdf_readuv(grd_uv,ges_u,ges_v,fv3filenamegin)
     ges_u=worksub(1,:,:,:)
     ges_v=worksub(2,:,:,:)
     deallocate(worksub)
+    deallocate(hwork)
 
 end subroutine gsi_fv3ncdf_readuv
 subroutine gsi_fv3ncdf_readuv_v1(grd_uv,ges_u,ges_v,fv3filenamegin)
@@ -2770,7 +2777,7 @@ subroutine gsi_fv3ncdf_readuv_v1(grd_uv,ges_u,ges_v,fv3filenamegin)
     real(r_kind)   ,intent(out  ) :: ges_u(grd_uv%lat2,grd_uv%lon2,grd_uv%nsig) 
     real(r_kind)   ,intent(out  ) :: ges_v(grd_uv%lat2,grd_uv%lon2,grd_uv%nsig) 
     type (type_fv3regfilenameg),intent (in) :: fv3filenamegin
-    real(r_kind),dimension(2,grd_uv%nlat,grd_uv%nlon,grd_uv%kbegin_loc:grd_uv%kend_alloc):: hwork
+    real(r_kind),allocatable::hwork(:,:,:,:)
     character(len=:),allocatable :: filenamein
     real(r_kind),allocatable,dimension(:,:):: us2d,vw2d
     real(r_kind),allocatable,dimension(:,:):: uorv2d
@@ -2788,6 +2795,7 @@ subroutine gsi_fv3ncdf_readuv_v1(grd_uv,ges_u,ges_v,fv3filenamegin)
     integer(i_kind) us_countloc(3),us_startloc(3)
     integer(i_kind) vw_countloc(3),vw_startloc(3)
 
+    allocate(hwork(2,grd_uv%nlat,grd_uv%nlon,grd_uv%kbegin_loc:grd_uv%kend_alloc))
     allocate (worksub(2,grd_uv%lat2,grd_uv%lon2,grd_uv%nsig))
     mm1=mype+1
     nloncase=grd_uv%nlon
@@ -2846,6 +2854,7 @@ subroutine gsi_fv3ncdf_readuv_v1(grd_uv,ges_u,ges_v,fv3filenamegin)
     ges_v=worksub(2,:,:,:)
     iret=nf90_close(gfile_loc)
     deallocate (us2d,vw2d,worksub)
+    deallocate(hwork)
 
 end subroutine gsi_fv3ncdf_readuv_v1
 
@@ -2891,7 +2900,7 @@ subroutine gsi_fv3ncdf_read_ens_parallel_over_ens(filenamein,fv3filenamegin, &
     type (type_fv3regfilenameg),intent(in) ::fv3filenamegin
     integer(i_kind)   ,intent(in   ) :: iope
     real(r_kind),allocatable,dimension(:,:):: uu2d, uu2d_tmp
-    real(r_kind),dimension(nlat,nlon,nsig):: hwork
+    real(r_kind),allocatable:: hwork(:,:,:)
     real(r_kind),dimension(nlat,nlon,nsig),intent(out),optional:: delp,tsen,w,q,oz,ql,qr,qs,qi,qg,dbz,fed
     character(len=max_varname_length) :: varname
     character(len=max_varname_length) :: name
@@ -2909,6 +2918,7 @@ subroutine gsi_fv3ncdf_read_ens_parallel_over_ens(filenamein,fv3filenamegin, &
     integer(i_kind),allocatable :: gfile_loc_layout(:)
     character(len=180)  :: filename_layout
 
+    allocate(hwork(nlat,nlon,nsig))
     mm1=mype+1
     nloncase=nlon
     nlatcase=nlat
@@ -3075,6 +3085,7 @@ subroutine gsi_fv3ncdf_read_ens_parallel_over_ens(filenamein,fv3filenamegin, &
 
        deallocate (uu2d,varname_files)
     end if
+    deallocate(hwork)
 
     return
 end subroutine gsi_fv3ncdf_read_ens_parallel_over_ens
@@ -3118,7 +3129,7 @@ subroutine gsi_fv3ncdf_readuv_ens_parallel_over_ens(ges_u,ges_v,fv3filenamegin,i
     real(r_kind)   ,intent(out  ) :: ges_v(nlat,nlon,nsig)
     type (type_fv3regfilenameg),intent (in) :: fv3filenamegin
     integer(i_kind), intent(in)   :: iope
-    real(r_kind),dimension(2,nlat,nlon,nsig):: hwork
+    real(r_kind),allocatable:: hwork(:,:,:,:)
     character(:), allocatable:: filenamein
     real(r_kind),allocatable,dimension(:,:):: u2d,v2d
     real(r_kind),allocatable,dimension(:,:):: uc2d,vc2d
@@ -3138,6 +3149,7 @@ subroutine gsi_fv3ncdf_readuv_ens_parallel_over_ens(ges_u,ges_v,fv3filenamegin,i
     integer(i_kind),allocatable :: gfile_loc_layout(:)
     character(len=180)  :: filename_layout
 
+    allocate(hwork(2,nlat,nlon,nsig))
     mm1=mype+1
     nloncase=nlon
     nlatcase=nlat
@@ -3243,6 +3255,7 @@ subroutine gsi_fv3ncdf_readuv_ens_parallel_over_ens(ges_u,ges_v,fv3filenamegin,i
        ges_u = hwork(1,:,:,:)
        ges_v = hwork(2,:,:,:)
     end if ! mype
+    deallocate(hwork)
 
 end subroutine gsi_fv3ncdf_readuv_ens_parallel_over_ens
 
@@ -3688,7 +3701,7 @@ subroutine gsi_fv3ncdf_writeuv(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
 
     implicit none
     type(sub2grid_info), intent(in):: grd_uv 
-    real(r_kind),dimension(2,grd_uv%nlat,grd_uv%nlon,grd_uv%kbegin_loc:grd_uv%kend_alloc):: hwork
+    real(r_kind),allocatable:: hwork(:,:,:,:)
 
     logical        ,intent(in   ) :: add_saved
     type (type_fv3regfilenameg),intent(in) ::fv3filenamegin
@@ -3719,6 +3732,7 @@ subroutine gsi_fv3ncdf_writeuv(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
     integer(i_kind),allocatable :: gfile_loc_layout(:)
     character(len=180)  :: filename_layout
 
+    allocate(hwork(2,grd_uv%nlat,grd_uv%nlon,grd_uv%kbegin_loc:grd_uv%kend_alloc))
     mm1=mype+1
     
     nloncase=grd_uv%nlon
@@ -3880,6 +3894,7 @@ subroutine gsi_fv3ncdf_writeuv(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
  
     deallocate(work_bu,work_bv,u2d,v2d)
     deallocate(work_au,work_av)
+    deallocate(hwork)
 
 end subroutine gsi_fv3ncdf_writeuv
 subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
@@ -3924,7 +3939,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
     real(r_kind),dimension(grd_uv%lat2,grd_uv%lon2,grd_uv%nsig),intent(inout)::ges_v
     logical        ,intent(in   ) :: add_saved
     type (type_fv3regfilenameg),intent (in) :: fv3filenamegin
-    real(r_kind),dimension(2,grd_uv%nlat,grd_uv%nlon,grd_uv%kbegin_loc:grd_uv%kend_alloc):: hwork
+    real(r_kind),allocatable:: hwork(:,:,:,:)
     character(len=:),allocatable :: filenamein
     character(len=max_varname_length) :: varname
 
@@ -3945,6 +3960,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
     integer(i_kind) uw_countloc(3),us_countloc(3),uw_startloc(3),us_startloc(3)
     integer(i_kind) vw_countloc(3),vs_countloc(3),vw_startloc(3),vs_startloc(3)
 
+    allocate(hwork(2,grd_uv%nlat,grd_uv%nlon,grd_uv%kbegin_loc:grd_uv%kend_alloc))
     mm1=mype+1
     nloncase=grd_uv%nlon
     nlatcase=grd_uv%nlat
@@ -4095,6 +4111,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
     endif
 
     if(allocated(worksub))deallocate(worksub)
+    deallocate(hwork)
 
 end subroutine gsi_fv3ncdf_writeuv_v1
 
@@ -4269,7 +4286,7 @@ subroutine gsi_fv3ncdf_write(grd_ionouv,cstate_nouv,add_saved,filenamein,fv3file
     logical        ,intent(in   ) :: add_saved
     character(len=:), allocatable, intent(in) :: filenamein
     type (type_fv3regfilenameg),intent (in) :: fv3filenamegin
-    real(r_kind),dimension(1,grd_ionouv%nlat,grd_ionouv%nlon,grd_ionouv%kbegin_loc:grd_ionouv%kend_alloc):: hwork
+    real(r_kind),allocatable :: hwork(:,:,:,:)
     character(len=max_filename_length) :: filenamein2 
     character(len=max_varname_length) :: varname,vgsiname,name
 
@@ -4295,6 +4312,7 @@ subroutine gsi_fv3ncdf_write(grd_ionouv,cstate_nouv,add_saved,filenamein,fv3file
     integer(i_kind),allocatable :: gfile_loc_layout(:)
     character(len=180)  :: filename_layout
 
+    allocate(hwork(1,grd_ionouv%nlat,grd_ionouv%nlon,grd_ionouv%kbegin_loc:grd_ionouv%kend_alloc))
     mm1=mype+1
     ! Convert from subdomain to full horizontal field distributed among
     ! processors
@@ -4471,6 +4489,7 @@ subroutine gsi_fv3ncdf_write(grd_ionouv,cstate_nouv,add_saved,filenamein,fv3file
 
     deallocate(work_b,work_a)
     deallocate(workb2,worka2)
+    deallocate(hwork)
 
 end subroutine gsi_fv3ncdf_write
 subroutine check(status)
