@@ -105,7 +105,18 @@
      nrf_var,lcalc_gfdl_cfrac,incvars_to_zero,incvars_zero_strat,incvars_efold 
   use derivsmod, only: init_anadv
   use berror, only: norh,ndeg,vs,bw,init_berror,hzscl,hswgt,pert_berr,pert_berr_fct,&
-     bkgv_flowdep,bkgv_rewgtfct,bkgv_write,fpsproj,nhscrf,adjustozvar,fut2ps,cwcoveqqcov
+     bkgv_flowdep,bkgv_rewgtfct,bkgv_write,fpsproj,nhscrf,adjustozvar,fut2ps,cwcoveqqcov,&
+!MGBF>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+     multigrid_betafct, &
+     mg_ampl01,mg_ampl02,mg_ampl03, &
+     mg_weig1,mg_weig2,mg_weig3,mg_weig4, &
+     hx_filt,hy_filt,hz_filt,p_filt, &
+     mgbf_line,mgbf_proc, &
+     lquart,lhelm, &
+     lm_filt,lmf_filt,lmh_filt, &
+     nm0_filt,mm0_filt, &
+     nxm_filt,mym_filt,im_filt,jm_filt
+!MGBF<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
   use m_berror_stats, only: usenewgfsberror
   use anberror, only: anisotropic,ancovmdl,init_anberror,npass,ifilt_ord,triad4, &
      binom,normal,ngauss,rgauss,anhswgt,an_vs,&
@@ -212,6 +223,11 @@
                                i_melt_snow, i_melt_graupel,                        &
                                cld_cv, cld_nt_updt,  i_w_updt,                     &
                                l_cvpnr, cvpnr_pval, l_use_tdep_radarz
+
+!MGBF>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+  use mg_entrymod, only: mg_initialize,mg_finalize
+  use mg_timers
+!MGBF<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
   implicit none
 
@@ -487,6 +503,8 @@
 !  01-07-2022 Hu        Add fv3_io_layout_y to let fv3lam interface read/write subdomain restart
 !                       files. The fv3_io_layout_y needs to match fv3lam model
 !                       option io_layout(2).
+!  09-28-2020 pondeca   add logical variable multigrid_betafct
+!  12-16-2022 Rancic     included multigrid beta filter (MGBF)
 !
 !EOP
 !-------------------------------------------------------------------------
@@ -825,9 +843,21 @@
 !     fut2ps  - controls the projection from unbalance T to surface pressure
 !     adjustozvar - adjusts ozone variances in the stratosphere based on guess field
 !     cwcoveqqcov  - sets cw Bcov to be the same as B-cov(q) (presently glb default)
+!     multigrid_betafct - if true, then use multigrid-beta function background error
 
   namelist/bkgerr/vs,nhscrf,hzscl,hswgt,norh,ndeg,noq,bw,norsp,fstat,pert_berr,pert_berr_fct, &
-      bkgv_flowdep,bkgv_rewgtfct,bkgv_write,fpsproj,adjustozvar,fut2ps,cwcoveqqcov,usenewgfsberror
+      bkgv_flowdep,bkgv_rewgtfct,bkgv_write,fpsproj,adjustozvar,fut2ps,cwcoveqqcov,usenewgfsberror, &
+!MGBF>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+      multigrid_betafct, &
+      mg_ampl01,mg_ampl02,mg_ampl03, &
+      mg_weig1,mg_weig2,mg_weig3,mg_weig4, &
+      hx_filt,hy_filt,hz_filt,p_filt, &
+      mgbf_line,mgbf_proc, &
+      lquart,lhelm, &
+      lm_filt,lmf_filt,lmh_filt, &
+      nm0_filt,mm0_filt, &
+      nxm_filt,mym_filt,im_filt,jm_filt
+!MGBF<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 ! ANBKGERR (anisotropic background error related variables):
 !     anisotropic - if true, then use anisotropic background error
@@ -1576,6 +1606,8 @@
   real(r_kind):: varqc_max,c_varqc_new
   type(regional_io_class) :: regional_io
 
+                                            call btim(   total_tim)
+
   call gsi_4dcoupler_parallel_init
 
   call mpi_comm_size(mpi_comm_world,npe,ierror)
@@ -2119,6 +2151,14 @@
             
   if (regional.and.use_gfs_stratosphere) call broadcast_gfs_stratosphere_vars
 
+!MGBG
+  if(multigrid_betafct) then
+                                            call btim(   binit_tim)
+     call mg_initialize
+                                            call etim(   binit_tim)
+  endif
+!MGBF
+
 
 ! Initialize variables, create/initialize arrays
   call init_reg_glob_ll(mype,lendian_in)
@@ -2244,6 +2284,25 @@
   call gsi_metguess_final
   call clean_4dvar
   call destroy_qcvars
+
+!MGBF
+!***
+!*** finalize multigrid beta filter for the regional run
+!***
+  if(multigrid_betafct) then
+                                            call btim(   bfint_tim)
+     call mg_finalize
+                                            call etim(   bfint_tim)
+  endif
+
+                                            call etim(   total_tim)
+!***
+!*** Print MGBF wall clock and cpu timing
+!***
+      call print_mg_timers("timing_cpu.csv", print_cpu)
+
+!MGBF
+
 
 ! Done with GSI.
   if (mype==0)  call w3tage('GSI_ANL')

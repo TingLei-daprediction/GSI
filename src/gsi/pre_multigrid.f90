@@ -104,10 +104,16 @@ subroutine init_transf_flds(cvec)
   integer(i_kind),allocatable:: londecomp12_aux(:,:)
 
   num_fields=cvec%n3d*nsig+cvec%n2d
+!TEST
   if (mype==0) print*,'in create_transf_flds: num_fields=',num_fields
+  if (mype==0) print*,'in create_transf_flds: cvec%n3d  =',cvec%n3d
+  if (mype==0) print*,'in create_transf_flds: cvec%n2d  =',cvec%n2d
+  if (mype==0) print*,'in create_transf_flds: nsig      =',nsig
+!TEST
 
-!cltorg   allocate(worka(lat2,lon2,num_fields))
-  allocate(worka(num_fields,lat1,lon1))
+!T  allocate(worka(lat2,lon2,num_fields))
+!T  allocate(worka(num_fields,lat1,lon1))
+  allocate(worka(num_fields,lat2,lon2))
   allocate(vname_in_worka(cvec%n3d*nsig+cvec%n2d))
   allocate(vorder_in_worka(cvec%n3d+cvec%n2d))
   allocate(nvdim(cvec%n3d+cvec%n2d))
@@ -124,11 +130,13 @@ subroutine init_transf_flds(cvec)
         kk=kk+1
         vname_in_worka(kk)=cvec%r3(n)%shortname
      enddo
+  if (mype==0) print*,'in create_transf_flds: cvec%r3(n)%shortname,n=',cvec%r3(n)%shortname,n
   end do
 
   do n=1,cvec%n2d
      kk=kk+1
      vname_in_worka(kk)=cvec%r2(n)%shortname
+  if (mype==0) print*,'in create_transf_flds: cvec%r2(n)%shortname,n=',cvec%r2(n)%shortname,n
   end do
 
   do n=1,cvec%n3d+cvec%n2d
@@ -136,7 +144,8 @@ subroutine init_transf_flds(cvec)
         vorder_in_worka(n)=cvec%r3(n)%shortname
         nvdim(n)=3
       else
-        vorder_in_worka(n)=cvec%r2(n)%shortname
+        vorder_in_worka(n)=cvec%r2(n-cvec%n3d)%shortname
+!T        vorder_in_worka(n)=cvec%r2(n)%shortname
         nvdim(n)=2
      endif
   end do
@@ -256,15 +265,15 @@ subroutine mk_transf_fields(cvec,iflg)
         end do
      end do
   else                !forward operator "worka to bundle"
-!cltthink  how to define halo points 
+!cltthink  how to define halo points (in mg_transfer before sending back)
      kk=0
      do n=1,cvec%n3d
         call gsi_bundlegetpointer ( cvec,cvec%r3(n)%shortname,ptr3d,istatus )
         do k=1,nsig
            kk=kk+1
-           do i=2,lon2-1
-              do j=2,lat2-1
-                 ptr3d(kk,j,i)=worka(kk,j,i)
+           do i=1,lon2
+              do j=1,lat2
+                 ptr3d(j,i,k)=worka(kk,j,i)
               end do
            end do
         end do
@@ -273,9 +282,9 @@ subroutine mk_transf_fields(cvec,iflg)
      do n=1,cvec%n2d
         call gsi_bundlegetpointer(cvec,cvec%r2(n)%shortname,ptr2d,istatus)
         kk=kk+1
-        do i=2,lon2-1
-           do j=2,lat2-1
-              ptr2d(j,i)=worka(j,i,kk)
+        do i=1,lon2
+           do j=1,lat2
+              ptr2d(j,i)=worka(kk,j,i)
            end do
         end do
      end do
@@ -284,8 +293,8 @@ subroutine mk_transf_fields(cvec,iflg)
 !clt it is , of course, not an efficient way when such global communiation
 !clt is applied. M. Rannic would implement more efficient inner-neighbour halo
 !updating approach in the future. 
-    call general_sub2grid(grd_a,cvec%values,hwork)
-    call general_grid2sub(grd_a,hwork,cvec%values)
+!    call general_sub2grid(grd_a,cvec%values,hwork)
+!    call general_grid2sub(grd_a,hwork,cvec%values)
 
   end if
 

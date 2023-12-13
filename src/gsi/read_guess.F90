@@ -121,6 +121,8 @@ subroutine read_guess(iyear,month,idd,mype)
   use gsi_rfv3io_mod, only: bg_fv3regfilenameg
   use mpimod, only: mpi_comm_world
 
+  use mg_timers
+
   implicit none
 
 ! Declare passed variables
@@ -170,11 +172,13 @@ subroutine read_guess(iyear,month,idd,mype)
         else if (nems_nmmb_regional) then
            call nmm_binary_guess%read_nems_nmmb_guess(mype)
         else if (fv3_regional      ) then
+                                            call btim( input_tim)
            allocate(bg_fv3regfilenameg(nfldsig))
            do it=1,nfldsig   
               call bg_fv3regfilenameg(it)%init(it)
            end do
            call read_fv3_netcdf_guess(bg_fv3regfilenameg)
+                                            call etim( input_tim)
         else if (cmaq_regional) then
            call read_cmaq_guess(mype)
         end if

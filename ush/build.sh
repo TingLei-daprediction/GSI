@@ -7,6 +7,7 @@ readonly DIR_ROOT=$(cd "$(dirname "$(readlink -f -n "${BASH_SOURCE[0]}" )" )/.."
 
 # User Options
 BUILD_TYPE=${BUILD_TYPE:-"Release"}
+#BUILD_TYPE=${BUILD_TYPE:-"Debug"}
 CMAKE_OPTS=${CMAKE_OPTS:-}
 COMPILER=${COMPILER:-"intel"}
 BUILD_DIR=${BUILD_DIR:-"${DIR_ROOT}/build"}

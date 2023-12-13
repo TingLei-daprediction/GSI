@@ -600,6 +600,14 @@ end subroutine berror_read_bal_reg
            write(6,*)'Assigned default statistics to variable ',cvars(loc)
         endif
      end if
+
+     IF(MYPE==0) THEN
+        DO  K=1,NSIG
+        PRINT'(A26,1X,A8,1X,I2,4(1X,F13.3))','VAR,K,Lmin,max,Lvzmin,max=',cvars3d(n),K,MINVAL(hwll(:,k,n)),MAXVAL(hwll(:,k,n)),MINVAL(vz(k,0:mlat+1,n)),MAXVAL(vz(k,0:mlat+1,n))
+        PRINT'(A26,1X,A8,1X,I2,4(1X,F13.3))','VAR,K,Lmin,max,varmin,max=',cvars3d(n),K,MINVAL(hwll(:,k,n)),MAXVAL(hwll(:,k,n)),MINVAL(corz(:,k,n)),MAXVAL(corz(:,k,n))
+        ENDDO 
+     ENDIF
+
   enddo
 
 ! Get control variable indexes
@@ -718,9 +726,6 @@ end subroutine berror_read_bal_reg
       if(mype==0) write(6,*)'Replace default with appropriate statistics for variable sfwter'
       corz(1:mlat,1:nsig,nrf3_sfwter)=corz(1:mlat,1:nsig,nrf3_sf)
       hwll(0:mlat+1,1:nsig,nrf3_sfwter)=hwll(0:mlat+1,1:nsig,nrf3_sf)
-  endif
-
-  if (nrf3_vpwter>0) then
       if(mype==0) write(6,*)'Replace default with appropriate statistics for variable vpwter'
       corz(1:mlat,1:nsig,nrf3_vpwter)=corz(1:mlat,1:nsig,nrf3_vp)
       hwll(0:mlat+1,1:nsig,nrf3_vpwter)=hwll(0:mlat+1,1:nsig,nrf3_vp)
@@ -910,6 +915,9 @@ end subroutine berror_read_bal_reg
         do i=0,mlat+1
            hwllp(i,n)=hwll(i,1,nrf3_q)
         end do
+        IF(MYPE==0) THEN 
+           PRINT'(A24,1X,A8,1X,4(1X,F13.3))','VAR,Lmin,max,varmin,max=',cvars2d(n),MINVAL(hwllp(:,n)),MAXVAL(hwllp(:,n)),MINVAL(corp(:,n)),MAXVAL(corp(:,n))
+        ENDIF
      end if
 
   enddo
@@ -1016,6 +1024,9 @@ end subroutine berror_read_bal_reg
            hwllp(i,loc)=hwll_default
         end do
      end if
+     IF(MYPE==0) THEN
+        PRINT'(A24,1X,A8,1X,4(1X,F13.3))','VAR,Lmin,max,varmin,max=',cvarsmd(n),MINVAL(hwllp(:,n)),MAXVAL(hwllp(:,n)),MINVAL(corp(:,n)),MAXVAL(corp(:,n))
+     ENDIF
   enddo
 
   deallocate(nrf3_loc,nrf2_loc,nmotl_loc)

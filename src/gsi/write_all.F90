@@ -43,6 +43,8 @@ subroutine write_all(increment)
 
   use control_vectors, only: control_vector
 
+  use mg_timers
+
   implicit none
 
 ! !INPUT PARAMETERS:
@@ -121,7 +123,9 @@ subroutine write_all(increment)
 ! Regional output
   if (regional) then
      if (fv3_regional) then
+                                            call btim( output_tim)
         call wrfv3_netcdf(bg_fv3regfilenameg(ntguessig))
+                                            call etim( output_tim)
      else
         call io%write_regional_analysis(mype)
      endif
