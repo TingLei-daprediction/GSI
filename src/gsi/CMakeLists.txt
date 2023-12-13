@@ -102,6 +102,7 @@ list(APPEND GSI_SRC_Fortran
 if(GSI_MODE MATCHES "GFS") # GFS GSI application
   list(APPEND GSI_SRC_Fortran
     ${GSI_SRC_gfs_stub}
+    ${GSI_SRC_MGBF}
     ${GSI_SRC_fixture_gfs})
 elseif(GSI_MODE MATCHES "Regional") # Regional GSI application
   list(APPEND GSI_SRC_Fortran
