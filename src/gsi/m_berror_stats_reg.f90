@@ -12,7 +12,7 @@
       use kinds,only : i_kind,r_kind
       use constants, only: zero,one,max_varname_length,half
       use gridmod, only: nsig
-      use chemmod, only : berror_chem,upper2lower,lower2upper
+      use chemmod, only : berror_chem,berror_fv3_cmaq_regional,berror_fv3_sd_regional,upper2lower,lower2upper
       use m_berror_stats, only: usenewgfsberror,berror_stats
 
       implicit none
@@ -44,6 +44,7 @@
 !                       sigma from the global 127-L BE,which is used to
 !                       convert the grid unit of vertical length scale (vz) from
 !                       1/layer to the unit of 1/sigma.   
+!       2022-05-24 ESRL(H.Wang) - Add B for reginal FV3-CMAQ (berror_fv3_cmaq_regional=.true.) . 
 !EOP ___________________________________________________________________
 
   character(len=*),parameter :: myname='m_berror_stats_reg'
@@ -311,6 +312,7 @@ end subroutine berror_read_bal_reg
       use constants, only: zero,one,ten,three
       use mpeu_util,only: getindex
       use radiance_mod, only: icloud_cv,n_clouds_fwd,cloud_names_fwd
+      use chemmod, only: berror_fv3_cmaq_regional,berror_fv3_sd_regional
 
       implicit none
 
@@ -364,6 +366,8 @@ end subroutine berror_read_bal_reg
 !       2018-10-22 CAPS(C.Liu) - add w
 !       20Apr22 x.zhang - Add the code to convert the unit of global 127-L BE
 !                         vertical length scale from 1/layer to 1/sigma
+!       2022-05-24 ESRL(H.Wang) - Add B for reginal FV3-CMAQ
+!                        (berror_fv3_cmaq_regional=.true.) . 
 !
 !EOP ___________________________________________________________________
 
@@ -383,6 +387,11 @@ end subroutine berror_read_bal_reg
 
 
   character*5 :: varshort
+! varlong is for regional FV3-CMAQ model 
+! the B file should include stats of both meterological  and aerosol control
+! variables that are listed in anavinfo (control_vector section). 
+  character*10 :: varlong
+
   character(len=max_varname_length) :: var
   logical,dimension(nrf):: nrf_err
 
@@ -391,7 +400,7 @@ end subroutine berror_read_bal_reg
   integer(i_kind) :: nrf2_td2m,nrf2_mxtm,nrf2_mitm,nrf2_pmsl,nrf2_howv,nrf2_tcamt,nrf2_lcbas,nrf2_cldch
   integer(i_kind) :: nrf2_uwnd10m,nrf2_vwnd10m
   integer(i_kind) :: nrf3_sfwter,nrf3_vpwter
-  integer(i_kind) :: nrf3_dbz
+  integer(i_kind) :: nrf3_dbz,nrf3_fed
   integer(i_kind) :: nrf3_ql,nrf3_qi,nrf3_qr,nrf3_qs,nrf3_qg,nrf3_qnr,nrf3_w
   integer(i_kind) :: inerr,istat
   integer(i_kind) :: nsigstat,nlatstat,isig
@@ -457,8 +466,13 @@ end subroutine berror_read_bal_reg
         var=upper2lower(varshort)
         if (trim(var) == 'pm25') var = 'pm2_5'
      else 
-        read(inerr,iostat=istat) varshort, isig
-        var=varshort
+        if ( berror_fv3_cmaq_regional .or. berror_fv3_sd_regional) then
+          read(inerr,iostat=istat) varlong, isig
+          var=varlong
+        else
+          read(inerr,iostat=istat) varshort, isig
+          var=varshort
+        endif
      endif
      if (istat /= 0) exit read
      do n=1,nrf
@@ -618,6 +632,7 @@ end subroutine berror_read_bal_reg
   nrf3_sf =getindex(cvars3d,'sf')
   nrf3_vp =getindex(cvars3d,'vp')
   nrf3_dbz=getindex(cvars3d,'dbz')
+  nrf3_fed=getindex(cvars3d,'fed')
   nrf2_sst=getindex(cvars2d,'sst')
   nrf2_gust=getindex(cvars2d,'gust')
   nrf2_vis=getindex(cvars2d,'vis')
@@ -663,6 +678,16 @@ end subroutine berror_read_bal_reg
     corz(:,:,nrf3_dbz)=10.0_r_kind
     hwll(:,:,nrf3_dbz)=hwll(:,:,nrf3_t)
     vz(:,:,nrf3_dbz)=vz(:,:,nrf3_t)
+  endif
+
+  if( nrf3_fed>0 )then
+    if(.not. nrf3_t>0) then
+      write(6,*)'not as expect,stop'
+      stop
+    endif
+    corz(:,:,nrf3_fed)=10.0_r_kind
+    hwll(:,:,nrf3_fed)=hwll(:,:,nrf3_t)
+    vz(:,:,nrf3_fed)=vz(:,:,nrf3_t)
   endif
 
   if (nrf3_oz>0) then 
@@ -861,16 +886,17 @@ end subroutine berror_read_bal_reg
            hwllp(i,n)=hwllp(i,nrf2_ps)
         end do
      else if (n==nrf2_howv) then
-         call read_howv_stats(mlat,1,2,cov_dum)
+         call read_howv_stats(mlat,1,2,cov_dum,mype)
          do i=1,mlat
             corp(i,n)=cov_dum(i,1,1)     !#ww3
             hwllp(i,n) = cov_dum(i,1,2) 
          end do
          hwllp(0,n) = hwllp(1,n)
          hwllp(mlat+1,n) = hwllp(mlat,n)
-
-         if (mype==0) print*, 'corp(i,n) = ', corp(:,n)
-         if (mype==0) print*, ' hwllp(i,n) = ',  hwllp(:,n)
+         if (mype==0) then
+            print*, myname_, ' static BE corp( :,n) (for ', trim(adjustl(cvars2d(n))), ')= ', corp(:,n)
+            print*, myname_, ' static BE hwllp(:,n) (for ', trim(adjustl(cvars2d(n))), ')= ', hwllp(:,n)
+         end if
 !         corp(:,n)=cov_dum(:,1)
         !do i=1,mlat
         !   corp(i,n)=0.4_r_kind     !#ww3
@@ -1052,7 +1078,7 @@ end subroutine berror_read_bal_reg
 end subroutine berror_read_wgt_reg
 
 !++++
-subroutine read_howv_stats(nlat,nlon,npar,arrout)
+subroutine read_howv_stats(nlat,nlon,npar,arrout,mype)
 !$$$  subprogram documentation block
 !                .      .    .                                       .
 ! subprogram: read_howv_stats   
@@ -1087,6 +1113,9 @@ subroutine read_howv_stats(nlat,nlon,npar,arrout)
 ! program history log:
 !   2016-08-03  stelios
 !   2016-08-26  stelios : Compatible with GSI.
+!   2023-07-30  Zhao    - added code to set the background error 
+!                         standard deviation (corp_howv) and de-correlation
+!                         length scale (hwllp_howv) for non-2DRTMA run
 !   input argument list:
 !     filename -  The name of the file 
 !   output argument list:
@@ -1099,10 +1128,14 @@ subroutine read_howv_stats(nlat,nlon,npar,arrout)
 !$$$ end documentation block
 !
    use kinds,only : r_kind, i_kind
+   use gridmod, only : twodvar_regional
+   use rapidrefresh_cldsurf_mod, only : corp_howv, hwllp_howv
+   use gsi_io, only : verbose
 !
    implicit none
 ! Declare passed variables
    integer(i_kind),   intent(in   )::nlat,nlon,npar
+   integer(i_kind),   intent(in   ) :: mype  ! "my" processor ID
    real(r_kind), dimension(nlat ,nlon, npar),  intent(  out)::arrout
 ! Declare local variables
    integer(i_kind) :: reclength,i,j,i_npar
@@ -1114,12 +1147,18 @@ subroutine read_howv_stats(nlat,nlon,npar,arrout)
 !
    filename(1) = 'howv_var_berr.bin'
    filename(2) = 'howv_lng_berr.bin'
-!
-   arrout(:,:,1)=0.42_r_kind
-   arrout(:,:,2)=50000.0_r_kind
+!-- first, assign the pre-defined values to corp and hwllp
+   if ( twodvar_regional ) then
+      arrout(:,:,1)=0.42_r_kind           ! values were specified by Manuel and Stelio for 2DRTMA
+      arrout(:,:,2)=50000.0_r_kind        ! values were specified by Manuel and Stelio for 2DRTMA
+   else
+      arrout(:,:,1) = corp_howv           ! 0.42_r_kind used in 3dvar (default) if not set in namelist
+      arrout(:,:,2) = hwllp_howv          ! 17000.0_r_kind used in 3dvar (default) if not set in namelist
+   end if
 
    reclength=nlat*r_kind
-!
+!-- secondly, if files for corp and hwllp are available, then read them in for
+!     corp and hwllp. If the files are not found, then use the pre-defined values.
    do i_npar = 1,npar
       inquire(file=trim(filename(i_npar)), exist=file_exists)
       if (file_exists)then
@@ -1129,9 +1168,16 @@ subroutine read_howv_stats(nlat,nlon,npar,arrout)
             read(unit=lun34 ,rec=j) (arrout(i,j,i_npar), i=1,nlat)
          enddo
          close(unit=lun34)
+         if (verbose .and. mype .eq. 0) then         
+           write(6,'(1x,A,1x,A2,1x,A)') trim(adjustl(myname)), '::',    &
+             trim(filename(i_npar))//' is used for background error of howv.'
+         end if
 
       else 
-         print*,myname, trim(filename(i_npar)) // ' does not exist'
+         if (verbose .and. mype .eq. 0) then         
+           write(6,'(1x,A,1x,A2,1x,A)') trim(adjustl(myname)), '::',    &
+             trim(filename(i_npar))//' does not exist for static BE of howv, using pre-defined values.'
+         end if
       end if
    end do
 end subroutine read_howv_stats

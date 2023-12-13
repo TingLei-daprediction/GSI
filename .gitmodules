@@ -1,7 +1,4 @@
 [submodule "fix"]
-	path = fix
-	url = gerrit:GSI-fix
-[submodule "ncdiag"]
-	path = src/ncdiag
-	url = https://github.com/NOAA-EMC/GSI-ncdiag
-	branch = v1.0.0
+  path = fix
+  url = https://github.com/NOAA-EMC/GSI-fix
+  branch = develop

@@ -61,7 +61,8 @@ subroutine setupaod(obsLL,odiagLL,lunin,mype,nchanl,nreal,nobs,&
            dplat,lobsdiagsave,lobsdiag_allocated,&
            dirname,time_offset,luse_obsdiag
   use nc_diag_write_mod, only: nc_diag_init, nc_diag_header, nc_diag_metadata, &
-       nc_diag_write, nc_diag_data2d, nc_diag_chaninfo_dim_set, nc_diag_chaninfo
+       nc_diag_write, nc_diag_data2d, nc_diag_chaninfo_dim_set, nc_diag_chaninfo, &
+       nc_diag_metadata_to_single
   use nc_diag_read_mod, only: nc_diag_read_init, nc_diag_read_get_dim, nc_diag_read_close
   use gsi_4dvar, only: nobs_bins,hr_obsbin
   use gridmod, only: nsig,get_ij
@@ -69,6 +70,9 @@ subroutine setupaod(obsLL,odiagLL,lunin,mype,nchanl,nreal,nobs,&
   use jfunc, only: jiter,miter
   use m_dtime, only: dtime_setup, dtime_check
   use chemmod, only: laeroana_gocart, l_aoderr_table
+  use chemmod, only: naero_cmaq_fv3,aeronames_cmaq_fv3,imodes_cmaq_fv3,laeroana_fv3cmaq
+  use gridmod, only: fv3_cmaq_regional
+
   use aeroinfo, only: jpch_aero, nusis_aero, nuchan_aero, iuse_aero, &
        error_aero, gross_aero
   use m_obsdiagNode, only: obs_diag
@@ -176,6 +180,7 @@ subroutine setupaod(obsLL,odiagLL,lunin,mype,nchanl,nreal,nobs,&
   real(r_kind)    :: qcall, smask
   real(r_kind)    :: styp, dbcf
 
+  real(r_kind),dimension(nchanl):: chan_level
   real(r_kind),dimension(nchanl):: emissivity,ts,emissivity_k
   real(r_kind),dimension(nchanl):: tsim
   real(r_kind),dimension(nsig,nchanl):: wmix,temp,ptau5
@@ -187,8 +192,7 @@ subroutine setupaod(obsLL,odiagLL,lunin,mype,nchanl,nreal,nobs,&
   type(obsLList),pointer,dimension(:):: aerohead
   aerohead => obsLL(:)
 
-
-  if ( .not. laeroana_gocart ) then
+  if ( .not. laeroana_gocart .and. .not. laeroana_fv3cmaq) then
      return
   endif
 
@@ -215,7 +219,6 @@ subroutine setupaod(obsLL,odiagLL,lunin,mype,nchanl,nreal,nobs,&
   else              ! obstype /= 'modis_aod' or 'viirs_aod'
      write(6,*)'SETUP_AOD:  *** WARNING: unknown aerosol input type, obstype=',obstype
   end if
-
 
 ! Determine cloud & aerosol usages in radiance assimilation
   call radiance_obstype_search(obstype,radmod)
@@ -301,7 +304,6 @@ subroutine setupaod(obsLL,odiagLL,lunin,mype,nchanl,nreal,nobs,&
 ! Load data array for current satellite
   read(lunin) data_s,luse,ioid
 
-  write(*,*) 'read in AOD data ',nobs
 ! Loop over data in this block
   call dtime_setup()
   do n = 1,nobs
@@ -373,6 +375,14 @@ subroutine setupaod(obsLL,odiagLL,lunin,mype,nchanl,nreal,nobs,&
                  case( 23 )     ! over bright land surface, high quality
                     tnoise = 0.0550472_r_kind+ 0.299558_r_kind*aod_obs
                end select
+               if (fv3_cmaq_regional)then
+                  if (aod_obs(n_viirs_550nm) < 0.4_r_kind)then
+                     tnoise = 0.0216_r_kind+ 0.1936_r_kind*aod_obs(n_viirs_550nm)
+                  else
+                     tnoise = -0.1081_r_kind+ 0.5005_r_kind*aod_obs(n_viirs_550nm)
+                  end if
+                  tnoise = max(0.0216_r_kind,tnoise)
+               end if
            else
               if (mype == 0) then
                  write(6,*),'unknown obstype = ',obstype
@@ -380,16 +390,30 @@ subroutine setupaod(obsLL,odiagLL,lunin,mype,nchanl,nreal,nobs,&
               end if
            end if ! end if obstype
         end if ! end if not l_aoderr_table
+
+!  if viirs_aod and fv3_cmaq_regional, apply bias correction 
+        if (obstype == 'viirs_aod' .and. fv3_cmaq_regional)then
+           do i = 1, nchanl
+             if ( i /= n_viirs_550nm) cycle
+             if (aod_obs(i) < 0.4_r_kind) then
+                aod_obs(i) = aod_obs(i) - ( 0.41_r_kind*aod_obs(i)-0.03_r_kind )
+             end if
+             if (aod_obs(i) >= 0.4_r_kind .and. aod_obs(i) < 0.9_r_kind)then
+               aod_obs(i) = aod_obs(i) - ( -0.119_r_kind*aod_obs(i)+0.121_r_kind )
+             end if
+             aod_obs(i) = max(0.0_r_kind,aod_obs(i))
+           end do
+        end if
+!
  
 !       Interpolate model fields to observation location, call crtm and create jacobians
         call call_crtm(obstype,dtime,data_s(:,n),nchanl,nreal,ich, &
-             tvp,qvp,clw_guess,ciw_guess,rain_guess,snow_guess,prsltmp,prsitmp, &
+             tvp,qvp,qsat,clw_guess,ciw_guess,rain_guess,snow_guess,prsltmp,prsitmp, &
              trop5,tzbgr,dtsavg,sfc_speed, &
-             tsim,emissivity,ptau5,ts,emissivity_k, &
+             tsim,emissivity,chan_level,ptau5,ts,emissivity_k, &
              temp,wmix,jacobian,error_status,layer_od=layer_od,jacobian_aero=jacobian_aero)
         ! interpolate aerosols at observation locations for diag files here
         if (aero_diagsave) then
-           call genqsat(qsat,tvp,prsltmp,1,1,nsig,.true.,0)
            rh = qvp/qsat
            call aero_guess_at_obs_locations(dtime,data_s(:,n),&
                nchanl,nreal,nsig, n_aerosols_fwd, aerosols, aerosol_names)
@@ -819,16 +843,16 @@ contains
          if ( iuse_aero(l) < 0 ) cycle
          call nc_diag_metadata("Channel_Index",         i)
          call nc_diag_metadata("Observation_Class",     obsclass)
-         call nc_diag_metadata("Latitude",              sngl(cenlat)) ! observation latitude (degrees)
-         call nc_diag_metadata("Longitude",             sngl(cenlon)) ! observation longitude (degrees)
-         call nc_diag_metadata("Obs_Time",              sngl(dtime))!-time_offset)) ! observation time (hours relative to analysis time)
-         call nc_diag_metadata("Sol_Zenith_Angle",      sngl(pangs)) ! solar zenith angle (degrees)
-         call nc_diag_metadata("Sol_Azimuth_Angle",     sngl(data_s(isazi_ang,n))) ! solar azimuth angle (degrees)
+         call nc_diag_metadata_to_single("Latitude",(cenlat)) ! observation latitude (degrees)
+         call nc_diag_metadata_to_single("Longitude",(cenlon)) ! observation longitude (degrees)
+         call nc_diag_metadata_to_single("Time",(dtime))!-time_offset)) ! observation time (hours relative to analysis time)
+         call nc_diag_metadata_to_single("Sol_Zenith_Angle",(pangs)) ! solar zenith angle (degrees)
+         call nc_diag_metadata_to_single("Sol_Azimuth_Angle",(data_s(isazi_ang,n))) ! solar azimuth angle (degrees)
          call nc_diag_metadata("Surface_type", nint(data_s(istyp,n)))
          call nc_diag_metadata("MODIS_deep_blue_flag", nint(dbcf) )
-         call nc_diag_metadata("Observation", sngl(diagbufchan(1,i))  )     ! observed aod
-         call nc_diag_metadata("Obs_Minus_Forecast_adjusted",sngl(diagbufchan(2,i)))
-         call nc_diag_metadata("Obs_Minus_Forecast_unadjusted",sngl(diagbufchan(2,i)))! obs - sim aod with no bias correction
+         call nc_diag_metadata("Observation",(diagbufchan(1,i))  )     ! observed aod
+         call nc_diag_metadata("Obs_Minus_Forecast_adjusted",(diagbufchan(2,i)))
+         call nc_diag_metadata("Obs_Minus_Forecast_unadjusted",(diagbufchan(2,i)))! obs - sim aod with no bias correction
 
          if (diagbufchan(3,i) > tiny_r_kind) then
             tmp(1)=one/diagbufchan(3,i)
@@ -837,7 +861,7 @@ contains
          end if
   
          call nc_diag_metadata("Observation_Error",tmp(1))
-         call nc_diag_metadata("QC_Flag", sngl(diagbufchan(4,i)))  !quality control mark or event indicator
+         call nc_diag_metadata("QC_Flag",(diagbufchan(4,i)))  !quality control mark or event indicator
          tmp(1)=get_zsfc()
          call nc_diag_metadata("sfc_height",tmp(1)) ! height in meters
   
