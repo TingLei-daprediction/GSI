@@ -3964,7 +3964,7 @@ subroutine gsi_fv3ncdf_writeuv(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
     use mod_fv3_lola, only: fv3_ll_to_h,fv3_h_to_ll, &
                             fv3uv2earth,earthuv2fv3
     use netcdf, only: nf90_open,nf90_close,nf90_noerr
-    use netcdf, only: nf90_write,nf90_netcdf4,nf90_mpiio,nf90_inq_varid
+    use netcdf, only: nf90_write,nf90_mpiio,nf90_inq_varid,nf90_var_par_access,nf90_collective
     use netcdf, only: nf90_put_var,nf90_get_var
     use general_sub2grid_mod, only: sub2grid_info,general_sub2grid
 
@@ -4052,11 +4052,11 @@ subroutine gsi_fv3ncdf_writeuv(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
           allocate(gfile_loc_layout(0:fv3_io_layout_y-1))
           do nio=0,fv3_io_layout_y-1
              write(filename_layout,'(a,a,I4.4)') trim(filenamein),".",nio
-             call check( nf90_open(filename_layout,ior(nf90_netcdf4,ior(nf90_write, nf90_mpiio)),gfile_loc_layout(nio),comm=mpi_comm_read,info=MPI_INFO_NULL) )
+             call check( nf90_open(filename_layout,ior(nf90_write, nf90_mpiio),gfile_loc_layout(nio),comm=mpi_comm_read,info=MPI_INFO_NULL) )
           enddo
           gfile_loc=gfile_loc_layout(0)
        else
-          call check( nf90_open(filenamein,ior(nf90_netcdf4,ior(nf90_write, nf90_mpiio)),gfile_loc,comm=mpi_comm_read,info=MPI_INFO_NULL) )
+          call check( nf90_open(filenamein,ior(nf90_write, nf90_mpiio),gfile_loc,comm=mpi_comm_read,info=MPI_INFO_NULL) )
        endif
        nz=grd_uv%nsig
        nzp1=nz+1
@@ -4066,6 +4066,7 @@ subroutine gsi_fv3ncdf_writeuv(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
        allocate( work_bv(nlon_regional+1,nlat_regional,kbgn_native:kend_native))
        u_startloc=(/1,1,kbgn_native,1/)
        u_countloc=(/nxcase,nycase+1,kend_native-kbgn_native+1,1/)
+       write(6,*)'thinkdeb333 kbng_native ',kbgn_native,' ' ,kend_native
        v_startloc=(/1,1,kbgn_native,1/)
        v_countloc=(/nxcase+1,nycase,kend_native-kbgn_native+1,1/)
        if(fv3_io_layout_y > 1) then
@@ -4086,8 +4087,20 @@ subroutine gsi_fv3ncdf_writeuv(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
        else
           call check( nf90_inq_varid(gfile_loc,'u',ugrd_VarId) )
           call check( nf90_inq_varid(gfile_loc,'v',vgrd_VarId) )
+         call check( nf90_var_par_access(gfile_loc, ugrd_VarId, nf90_collective) )
+         call check( nf90_var_par_access(gfile_loc, vgrd_VarId, nf90_collective) )
+
+          write(6,*)'thimkdeb255 before u'
+          call flush(6)
           call check( nf90_get_var(gfile_loc,ugrd_VarId,work_bu,start=u_startloc,count=u_countloc) )
+          write(6,*)'thimkdeb255 before v'
+          call flush(6)
           call check( nf90_get_var(gfile_loc,vgrd_VarId,work_bv,start=v_startloc,count=v_countloc) )
+          write(6,*)'thimkdeb255 after v'
+          call flush(6)
+       endif
+       if(kbgn_native.le.16.and.kend_native.ge.16) then
+            write(6,*)'thinkdeb222 v (159,13,16) ', work_bv(159,13,16)
        endif
 
 
@@ -4123,6 +4136,9 @@ subroutine gsi_fv3ncdf_writeuv(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
              call fv3_ll_to_h(work_av(:,:),v2d,nloncase,nlatcase,nlon_regional,nlat_regional,.true.)
              call earthuv2fv3(u2d,v2d,nlon_regional,nlat_regional,workbu2,workbv2)
 !!!!!!!!  add analysis_inc to readin work_b !!!!!!!!!!!!!!!!
+       if(inative.eq.16) then
+            write(6,*)'thinkdeb222 v and vinc (159,13,16) ', work_bv(159,13,16),' ',workbv2(159,13)
+       endif
              work_bu(:,:,inative)=work_bu(:,:,inative)+workbu2(:,:)
              work_bv(:,:,inative)=work_bv(:,:,inative)+workbv2(:,:)
              deallocate(workau2,workbu2,workav2,workbv2)
@@ -4206,7 +4222,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
     use mod_fv3_lola, only: fv3_ll_to_h,fv3_h_to_ll, &
                             fv3uv2earth,earthuv2fv3
     use netcdf, only: nf90_open,nf90_close,nf90_noerr
-    use netcdf, only: nf90_write,nf90_netcdf4, nf90_mpiio,nf90_inq_varid
+    use netcdf, only: nf90_write, nf90_mpiio,nf90_inq_varid
     use netcdf, only: nf90_put_var,nf90_get_var
     use general_sub2grid_mod, only: sub2grid_info,general_sub2grid
     implicit none
@@ -4254,6 +4270,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
        end do
     end do
     call general_sub2grid(grd_uv,worksub,hwork)
+    write(6,*)'thinkdeb xxxbegin'
 
     allocate( u2d(nlon_regional,nlat_regional)) 
     allocate( v2d(nlon_regional,nlat_regional))
@@ -4268,7 +4285,7 @@ subroutine gsi_fv3ncdf_writeuv_v1(grd_uv,ges_u,ges_v,add_saved,fv3filenamegin)
        allocate( workbu_s2(nlon_regional,nlat_regional+1))
        allocate( workbv_s2(nlon_regional,nlat_regional+1))
     filenamein=fv3filenamegin%dynvars
-    call check( nf90_open(filenamein,ior(nf90_netcdf4,ior(nf90_write, nf90_mpiio)),gfile_loc,comm=mpi_comm_world,info=MPI_INFO_NULL) )
+    call check( nf90_open(filenamein,ior(nf90_write, nf90_mpiio),gfile_loc,comm=mpi_comm_world,info=MPI_INFO_NULL) )
     do ilevtot=kbgn,kend
       varname=grd_uv%names(1,ilevtot)
       ilev=grd_uv%lnames(1,ilevtot)
@@ -4549,7 +4566,7 @@ subroutine gsi_fv3ncdf_write(grd_ionouv,cstate_nouv,add_saved,filenamein,fv3file
     use mod_fv3_lola, only: fv3_ll_to_h
     use mod_fv3_lola, only: fv3_h_to_ll
     use netcdf, only: nf90_open,nf90_close
-    use netcdf, only: nf90_write,nf90_netcdf4, nf90_mpiio,nf90_inq_varid
+    use netcdf, only: nf90_write, nf90_mpiio,nf90_inq_varid
     use netcdf, only: nf90_put_var,nf90_get_var
     use netcdf, only: nf90_inquire_dimension
     use gsi_bundlemod, only: gsi_bundle
@@ -4629,11 +4646,11 @@ subroutine gsi_fv3ncdf_write(grd_ionouv,cstate_nouv,add_saved,filenamein,fv3file
           allocate(gfile_loc_layout(0:fv3_io_layout_y-1))
           do nio=0,fv3_io_layout_y-1
              write(filename_layout,'(a,a,I4.4)') trim(filenamein),'.',nio
-             call check( nf90_open(filename_layout,ior(nf90_netcdf4,ior(nf90_write, nf90_mpiio)),gfile_loc_layout(nio),comm=mpi_comm_read,info=MPI_INFO_NULL) )
+             call check( nf90_open(filename_layout,ior(nf90_write, nf90_mpiio),gfile_loc_layout(nio),comm=mpi_comm_read,info=MPI_INFO_NULL) )
           enddo
           gfile_loc=gfile_loc_layout(0)
        else
-          call check( nf90_open(filenamein,ior(nf90_netcdf4,ior(nf90_write, nf90_mpiio)),gfile_loc,comm=mpi_comm_read,info=MPI_INFO_NULL) )
+          call check( nf90_open(filenamein,ior(nf90_write, nf90_mpiio),gfile_loc,comm=mpi_comm_read,info=MPI_INFO_NULL) )
        endif
        
        do ilevtot=kbgn,kend
@@ -4807,7 +4824,7 @@ subroutine gsi_fv3ncdf_write_v1(grd_ionouv,cstate_nouv,add_saved,filenamein,fv3f
     use mod_fv3_lola, only: fv3_ll_to_h
     use mod_fv3_lola, only: fv3_h_to_ll
     use netcdf, only: nf90_open,nf90_close
-    use netcdf, only: nf90_write, nf90_netcdf4,nf90_mpiio,nf90_inq_varid
+    use netcdf, only: nf90_write, nf90_mpiio,nf90_inq_varid
     use netcdf, only: nf90_put_var,nf90_get_var
     use gsi_bundlemod, only: gsi_bundle
     use general_sub2grid_mod, only: sub2grid_info,general_sub2grid
@@ -4846,7 +4863,7 @@ subroutine gsi_fv3ncdf_write_v1(grd_ionouv,cstate_nouv,add_saved,filenamein,fv3f
     allocate( work_b(nlon_regional,nlat_regional))
     allocate( workb2(nlon_regional,nlat_regional))
     allocate( worka2(nlatcase,nloncase))
-    call check ( nf90_open(filenamein,ior(nf90_netcdf4,ior(nf90_write, nf90_mpiio)),gfile_loc,comm=mpi_comm_world,info=MPI_INFO_NULL)) !clt
+    call check ( nf90_open(filenamein,ior(nf90_write, nf90_mpiio),gfile_loc,comm=mpi_comm_world,info=MPI_INFO_NULL)) !clt
     do ilevtot=kbgn,kend
       vgsiname=grd_ionouv%names(1,ilevtot)
       if(trim(vgsiname)=='amassi') cycle
