@@ -85,7 +85,9 @@ character(len=120),dimension(7),public :: fgsfcfileprefixes
 character(len=120),dimension(7),public :: statefileprefixes
 character(len=120),dimension(7),public :: statesfcfileprefixes
 character(len=120),dimension(7),public :: anlfileprefixes
+character(len=120),dimension(7),public :: anlsfcfileprefixes
 character(len=120),dimension(7),public :: incfileprefixes
+character(len=120),dimension(7),public :: incsfcfileprefixes
 ! analysis date string (YYYYMMDDHH)
 character(len=10), public ::  datestring
 ! Hour for datestring
@@ -122,6 +124,8 @@ real(r_single),public ::  zhuberleft,zhuberright
 real(r_single),public ::  lnsigcutoffnh,lnsigcutofftr,lnsigcutoffsh,&
                lnsigcutoffsatnh,lnsigcutoffsattr,lnsigcutoffsatsh,&
                lnsigcutoffpsnh,lnsigcutoffpstr,lnsigcutoffpssh
+real(r_single),public ::  corrlengthfednh,corrlengthfedtr,corrlengthfedsh, &
+               lnsigcutofffednh,lnsigcutofffedtr,lnsigcutofffedsh
 real(r_single),public ::  corrlengthrdrnh,corrlengthrdrtr,corrlengthrdrsh, &
                lnsigcutoffrdrnh,lnsigcutoffrdrtr,lnsigcutoffrdrsh
 real(r_single),public :: analpertwtnh,analpertwtsh,analpertwttr,sprd_tol,saterrfact
@@ -224,12 +228,6 @@ logical,public :: efsoi_cycling = .false.
 ! EFSOI calculation applications
 logical,public :: efsoi_flag = .false.
 
-! if true, use ensemble mean qsat in definition of
-! normalized humidity analysis variable (instead of
-! qsat for each member, which is the default behavior
-! when pseudo_rh=.true.  If pseudo_rh=.false, use_qsatensmean
-! is ignored.
-logical,public :: use_qsatensmean = .false.
 logical,public :: write_spread_diag = .false.
 ! if true, use jacobian from GSI stored in diag file to compute
 ! ensemble perturbations in observation space.
@@ -259,14 +257,16 @@ logical,public :: write_ensmean = .false.
 namelist /nam_enkf/datestring,datapath,iassim_order,nvars,&
                    covinflatemax,covinflatemin,deterministic,sortinc,&
                    mincorrlength_fact,corrlengthnh,corrlengthtr,corrlengthsh,&
-                   varqc,huber,nlons,nlats,smoothparm,use_qsatensmean,&
+                   varqc,huber,nlons,nlats,smoothparm,&
                    readin_localization, zhuberleft,zhuberright,&
                    obtimelnh,obtimeltr,obtimelsh,reducedgrid,&
                    lnsigcutoffnh,lnsigcutofftr,lnsigcutoffsh,&
                    lnsigcutoffsatnh,lnsigcutoffsattr,lnsigcutoffsatsh,&
                    lnsigcutoffpsnh,lnsigcutoffpstr,lnsigcutoffpssh,&
+                   corrlengthfednh,corrlengthfedsh,corrlengthfedtr,&
+                   lnsigcutofffednh,lnsigcutofffedsh,lnsigcutofffedtr,&
                    fgfileprefixes,fgsfcfileprefixes,anlfileprefixes, &
-                   incfileprefixes, &
+                   anlsfcfileprefixes,incfileprefixes,incsfcfileprefixes,&
                    statefileprefixes,statesfcfileprefixes, &
                    covl_minfact,covl_efold,lupd_obspace_serial,letkf_novlocal,&
                    analpertwtnh,analpertwtsh,analpertwttr,sprd_tol,&
@@ -321,6 +321,10 @@ corrlengthsh = 2800_r_single
 corrlengthrdrnh = 10
 corrlengthrdrtr = 10
 corrlengthrdrsh = 10
+! corrlength (km) for GLM flash extent density
+corrlengthfednh = 30_r_single
+corrlengthfedtr = 30_r_single
+corrlengthfedsh = 30_r_single
 ! read in localization length scales from an external file.
 readin_localization = .false.
 ! min and max inflation.
@@ -345,6 +349,9 @@ lnsigcutoffpssh = -999._r_single  ! value for surface pressure
 lnsigcutoffrdrnh = 0.2_r_single  ! value for radar
 lnsigcutoffrdrtr = 0.2_r_single  ! value for radar
 lnsigcutoffrdrsh = 0.2_r_single  ! value for radar
+lnsigcutofffednh = 2._r_single    ! value for GLM flash extent density
+lnsigcutofffedtr = 2._r_single    ! value for GLM flash extent density 
+lnsigcutofffedsh = 2._r_single    ! value for GLM flash extent density
 ! ob time localization
 obtimelnh = 1.e10_r_single
 obtimeltr = 1.e10_r_single
@@ -460,8 +467,8 @@ dsis=' '
 ! Initialize first-guess and analysis file name prefixes.
 ! (blank means use default names)
 fgfileprefixes = ''; anlfileprefixes=''; statefileprefixes=''
-fgsfcfileprefixes = ''; statesfcfileprefixes=''
-incfileprefixes = ''
+anlsfcfileprefixes=''; fgsfcfileprefixes = ''; statesfcfileprefixes=''
+incfileprefixes = ''; incsfcfileprefixes = ''
 
 ! option for including convective clouds in the all-sky
 cnvw_option=.false.
@@ -679,10 +686,6 @@ if (nproc == 0) then
        letkf_flag) then
      print *,'warning: no time localization in LETKF!'
    endif
-   if ((write_ensmean .and. pseudo_rh) .and. .not. use_qsatensmean) then
-      print *,'write_ensmean=T requires use_qsatensmean=T when pseudo_rh=T'
-      call stop2(19)
-   endif
 
 
    print *, trim(adjustl(datapath))
@@ -720,7 +723,7 @@ do while (nhr_anal(nbackgrounds+1) > 0)
      endif
    endif
    if (trim(fgsfcfileprefixes(nbackgrounds+1)) .eq. "") then
-      fgsfcfileprefixes(nbackgrounds+1)="sfgsfc_"//datestring//"_fhr"//charfhr_anal(nbackgrounds+1)//"_"
+      fgsfcfileprefixes(nbackgrounds+1)="bfg_"//datestring//"_fhr"//charfhr_anal(nbackgrounds+1)//"_"
    end if
    nbackgrounds = nbackgrounds+1
 end do
@@ -742,7 +745,7 @@ do while (nhr_state(nstatefields+1) > 0)
      endif
    endif
    if (trim(statesfcfileprefixes(nstatefields+1)) .eq. "") then
-      statesfcfileprefixes(nstatefields+1)="sfgsfc_"//datestring//"_fhr"//charfhr_state(nstatefields+1)//"_"
+      statesfcfileprefixes(nstatefields+1)="bfg_"//datestring//"_fhr"//charfhr_state(nstatefields+1)//"_"
    end if
    nstatefields = nstatefields+1
 end do
@@ -760,6 +763,23 @@ do nb=1,nbackgrounds
 !      if (nbackgrounds > 1) then
         anlfileprefixes(nb)="sanl_"//datestring//"_fhr"//charfhr_anal(nb)//"_"
         incfileprefixes(nb)="incr_"//datestring//"_fhr"//charfhr_anal(nb)//"_"
+!      else
+!        anlfileprefixes(nb)="sanl_"//datestring//"_"
+!      endif
+     endif
+   endif
+   if (trim(anlsfcfileprefixes(nb)) .eq. "") then
+     ! default analysis file prefix
+     if (regional) then
+      if (nbackgrounds > 1) then
+        anlsfcfileprefixes(nb)="sfc_analysis_fhr"//charfhr_anal(nb)//"."
+      else
+        anlsfcfileprefixes(nb)="sfc_analysis."
+      endif
+     else ! global
+!      if (nbackgrounds > 1) then
+        anlsfcfileprefixes(nb)="banl_"//datestring//"_fhr"//charfhr_anal(nb)//"_"
+        incsfcfileprefixes(nb)="sfcincr_"//datestring//"_fhr"//charfhr_anal(nb)//"_"
 !      else
 !        anlfileprefixes(nb)="sanl_"//datestring//"_"
 !      endif
@@ -804,6 +824,10 @@ corrlengthsh = corrlengthsh * 1.e3_r_single/rearth
 corrlengthrdrnh = corrlengthrdrnh * 1.e3_r_single/rearth
 corrlengthrdrtr = corrlengthrdrtr * 1.e3_r_single/rearth
 corrlengthrdrsh = corrlengthrdrsh * 1.e3_r_single/rearth
+! rescale covariance localization length for GLM FED
+corrlengthfednh = corrlengthfednh * 1.e3_r_single/rearth
+corrlengthfedtr = corrlengthfedtr * 1.e3_r_single/rearth
+corrlengthfedsh = corrlengthfedsh * 1.e3_r_single/rearth
 
 ! convert targe area boundary into radians
 tar_minlat = tar_minlat * deg2rad

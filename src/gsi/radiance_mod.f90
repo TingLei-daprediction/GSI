@@ -338,7 +338,7 @@ contains
     use radinfo, only: nusis,jpch_rad,icloud4crtm,iaerosol4crtm
     use obsmod, only: ndat,dtype,dsis
     use gsi_io, only: verbose
-    use chemmod, only: laeroana_gocart
+    use chemmod, only: laeroana_gocart, laeroana_fv3cmaq
     implicit none
 
     logical :: first,diffistr,found
@@ -369,10 +369,9 @@ contains
        cloud_names_fwd=' '
        cloud_names_jac=' '
     end if
-
     if (iaerosol_fwd .and. all(iaerosol4crtm<0)) then
        iaerosol=.false.
-       if ( .not. laeroana_gocart ) then
+       if ( .not. laeroana_gocart .and. .not. laeroana_fv3cmaq) then
           iaerosol_fwd=.false.
           n_aerosols_fwd=0
           n_aerosols_jac=0   
@@ -1327,11 +1326,7 @@ contains
 
     do i=1,nchanl
        if (radmod%lcloud4crtm(i)<0) cycle
-       if (clw_obs <= cclr(i) .and. clw_guess_retrieval <= cclr(i) .and. abs(clw_obs-clw_guess_retrieval) < 0.001_r_kind) then
-           cld_rbc_idx(i)=one   !clear/clear
-       else
-           cld_rbc_idx(i)=zero
-       endif
+       if ((clw_obs-cclr(i))*(clw_guess_retrieval-cclr(i))<zero .and. abs(clw_obs-clw_guess_retrieval)>=0.005_r_kind) cld_rbc_idx(i)=zero
     end do
     return
 

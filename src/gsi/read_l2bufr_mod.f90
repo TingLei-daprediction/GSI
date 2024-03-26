@@ -22,6 +22,8 @@ module read_l2bufr_mod
 !   2011-07-04  todling  - fixes to run either single or double precision
 !   2020-10-23  S.Liu    - fix reading l2rw_bufr issue
 !   2020-10-14  xu/sippel - Add options to superob the GRO
+!   2021-12-08  s.liu    - change max_num_radars from 150 to 250
+!   2021-12-10  s.liu    - fixes to find the index of radar station
 !
 ! subroutines included:
 !   sub initialize_superob_radar - initialize superob parameters to defaults
@@ -54,9 +56,9 @@ module read_l2bufr_mod
   public :: range_max,del_time,l2superob_only,elev_angle_max,del_azimuth
   public :: minnum,del_range,del_elev
 
-  public :: invtllv,radar_sites,radar_box,radar_rmesh,radar_zmesh
+  public :: invtllv,radar_sites,radar_box,radar_rmesh,radar_zmesh,radar_pmot
 
-  integer(i_kind) minnum
+  integer(i_kind) minnum,radar_pmot
   real(r_kind) del_azimuth,del_elev,del_range,del_time,elev_angle_max,range_max,radar_rmesh,radar_zmesh 
   logical l2superob_only,radar_sites,radar_box 
 
@@ -98,6 +100,14 @@ contains
     radar_box=.false. 
     radar_rmesh=10._r_kind 
     radar_zmesh=500._r_kind 
+
+!  radar_pmot of 0,1,2,3 will save different sets of obs output
+!  radar_pmot - all obs - thin obs
+!  radar_pmot - all obs
+!  radar_pmot - use obs
+!  radar_pmot - use obs + thin obs
+
+    radar_pmot = 2
   end subroutine initialize_superob_radar
 
   subroutine radar_bufr_read_all(npe,mype)
@@ -147,7 +157,7 @@ contains
 
     integer(i_kind),intent(in):: npe,mype
 
-    integer(i_kind),parameter:: max_num_radars=150
+    integer(i_kind),parameter:: max_num_radars=250
     integer(i_kind),parameter:: maxobs=2e8 
     integer(i_kind),parameter:: n_gates_max=4000
     real(r_kind),parameter:: four_thirds = 4.0_r_kind / 3.0_r_kind
@@ -247,7 +257,7 @@ contains
     character(len=256),allocatable,dimension(:):: rtable 
     character(4),allocatable,dimension(:):: rsite 
     integer(i_kind),allocatable,dimension(:):: ruse 
- 
+
     print_verbose=.false.
     if(verbose) print_verbose=.true.
     if (radar_sites) then 
@@ -371,7 +381,7 @@ contains
              end do 
              if (radar_true == 0) cycle 
           end if 
-          ibyte=index(cstn_id_table,stn_id)
+          ibyte=locindex(stn_id_table,max_num_radars,stn_id)
           if(ibyte==0) then
              num_radars=num_radars+1
              if(num_radars>max_num_radars) then
@@ -548,7 +558,7 @@ contains
 	     cycle
 	  end if
 	  stn_id=chdr 
-	  ibyte=index(cmaster_stn_table,stn_id)
+	  ibyte=locindex(master_stn_table,max_num_radars,stn_id)
           if (radar_sites) then 
              radar_true=0 
              do i=1,radar_count 
@@ -562,7 +572,7 @@ contains
 	     write(6,*) ' index error in radar_bufr_read_all -- program stops -- ',ibyte,stn_id
 	     call stop2(99)
 	  else
-	     krad=1+(ibyte-1)/4
+	     krad=ibyte
 	  end if
 
 	  call ufbint(inbufr,rwnd,3,n_gates_max,n_gates,'DIST125M DMVR DVSW')
@@ -747,6 +757,7 @@ contains
           write(6,*)' nobs_hrbin=',nobs_hrbin1
           write(6,*)' nrange_max=',nrange_max1
        end if
+       deallocate(icount)
 
 !   Prepare to create superobs and write out.
        open(inbufr,file='radar_supobs_from_level2',form='unformatted',iostat=iret)
@@ -944,6 +955,7 @@ contains
        close(inbufr)
        close(inbufr)
     end if
+    deallocate(indx)
     deallocate(bins_work,bins,ibins2)
     if(l2superob_only) then
        call mpi_finalize(ierror)
@@ -1054,4 +1066,21 @@ SUBROUTINE invtllv(ALM,APH,TLMO,CTPH0,STPH0,TLM,TPH)
   TPH=ASIN(CTPH0*SPH+STPH0*CC)
   return
 END SUBROUTINE invtllv
+
+FUNCTION locindex(stnall,nstr,stn)
+  use kinds, only:  i_kind
+  implicit none
+  
+  integer(i_kind),intent(in):: nstr
+  character(4),intent(in):: stnall(nstr)
+  character(4),intent(in):: stn
+  integer(i_kind):: i,locindex
+  do i=1,nstr
+     locindex=index(stnall(i),stn)
+     if(locindex>0) then
+       locindex=i
+       exit
+     end if
+  end do
+END FUNCTION locindex
 end module read_l2bufr_mod
