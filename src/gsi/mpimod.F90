@@ -133,9 +133,26 @@ module mpimod
 ! the number of processors used to decompose the latitudinal dimension.
 ! By construction, nPE = nxPE * nyPE.
 ! 
-  integer(i_kind) :: nxpe=-1     ! optional layout information
-  integer(i_kind) :: nype=-1     ! optional layout information
+!MGBF
+!  integer(i_kind) :: nxpe=-1     ! optional layout information
+!  integer(i_kind) :: nype=-1     ! optional layout information
 
+! for 256 PE
+! integer(i_kind) :: nxpe=16     ! optional layout information
+! integer(i_kind) :: nype=16     ! optional layout information
+! for 400 PE
+! integer(i_kind) :: nxpe=20     ! optional layout information
+! integer(i_kind) :: nype=20     ! optional layout information
+! for 600 PE
+! integer(i_kind) :: nxpe=30     ! optional layout information
+! integer(i_kind) :: nype=20     ! optional layout information
+! for 768 PE
+! integer(i_kind) :: nxpe=32     ! optional layout information
+! integer(i_kind) :: nype=24     ! optional layout information
+! for 1024 PE
+ integer(i_kind) :: nxpe=32     ! optional layout information
+ integer(i_kind) :: nype=32     ! optional layout information
+!MGBF
 
 ! communication arrays...set up in init_mpi_vars  (almost none left)
 

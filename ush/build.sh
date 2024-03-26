@@ -7,6 +7,7 @@ readonly DIR_ROOT=$(cd "$(dirname "$(readlink -f -n "${BASH_SOURCE[0]}" )" )/.."
 
 # User Options
 BUILD_TYPE=${BUILD_TYPE:-"Release"}
+#BUILD_TYPE=${BUILD_TYPE:-"Debug"}
 CMAKE_OPTS=${CMAKE_OPTS:-}
 COMPILER=${COMPILER:-"intel"}
 BUILD_DIR=${BUILD_DIR:-"${DIR_ROOT}/build"}
@@ -22,9 +23,12 @@ source $DIR_ROOT/ush/detect_machine.sh
 
 # Load modules
 source $DIR_ROOT/ush/module-setup.sh
-module use $DIR_ROOT/modulefiles
+#module use $DIR_ROOT/modulefiles
+module use /scratch1/NCEPDEV/da/Miodrag.Rancic/Modules/modulefiles
 module load gsi_$MACHINE_ID
 module list
+
+module load gsi_hera.intel
 
 # Set CONTROLPATH variables for Regression testing on supported MACHINE_ID
 if [[ $MACHINE_ID = wcoss ]] ; then

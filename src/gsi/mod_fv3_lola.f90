@@ -117,6 +117,7 @@ subroutine generate_anl_grid(nx,ny,grid_lon,grid_lont,grid_lat,grid_latt)
   use mpimod, only: mype
   use egrid2agrid_mod, only: egrid2agrid_parm
   use mpimod, only: nxpe, nype
+  use berror, only: multigrid_betafct
   implicit none
 
   real(r_kind),allocatable,dimension(:)::xbh_a,xa_a,xa_b
@@ -152,7 +153,7 @@ subroutine generate_anl_grid(nx,ny,grid_lon,grid_lont,grid_lat,grid_latt)
   integer(i_kind) kk,k
   integer(i_kind) n1,nxtemp1,nytemp1,nfactor
   integer(i_kind) n_mgbf_levs
-  logical :: multigrid_betafct=.false. ! for temperary use
+!clt  logical :: multigrid_betafct=.false. ! for temperary use
 
 
   nord_e2a=4
@@ -197,16 +198,21 @@ subroutine generate_anl_grid(nx,ny,grid_lon,grid_lont,grid_lat,grid_latt)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 !--------------------------obtain analysis grid dimensions nxa,nya
+  write(6,*)'thinkdeb multigrid_betafct is ',multigrid_betafct
   if (multigrid_betafct /= .true.) then 
+    write(6,*)'thinkdeb 1 false'
     nxa=1+nint((nx-one)/grid_ratio_fv3_regional)
     nya=1+nint((ny-one)/grid_ratio_fv3_regional)
   else
+    write(6,*)'thinkdeb 1 true'
     n_mgbf_levs=4
     nfactor=2**n_mgbf_levs
     
 !find the maximum numbers of n_mgbf_actor smaller than nxa/nya respectively
-    nxtemp1=1+nint((nx-one)/grid_ratio_fv3_regional)
-    nytemp1=1+nint((ny-one)/grid_ratio_fv3_regional)
+    !clt nxtemp1=1+nint((nx-one)/grid_ratio_fv3_regional)
+    !clt nytemp1=1+nint((ny-one)/grid_ratio_fv3_regional)
+    nxtemp1=nx
+    nytemp1=ny
     n1=nxtemp1/nfactor/nxpe
     if (n1 > 0) then
       nxa=n1*nxpe*nfactor
@@ -219,13 +225,23 @@ subroutine generate_anl_grid(nx,ny,grid_lon,grid_lont,grid_lat,grid_latt)
     else
      write(6,*) " problem ..."
     endif
+    if(mype==0) print *,'mgbf: original and coverted nlat,nlon=nya,nxa= ',nxtemp1,nytemp1,nlat,nlon
   endif  
    
-  if(mype==0) print *,'mgbf: original and coverted nlat,nlon=nya,nxa= ',nxtemp1,nytemp1,nlat,nlon
     
+!TEST
+  nya=960
+  nxa=1440  
+!   nya = 1080
+!   nxa = 1800
+!TEST
   nlat=nya
   nlon=nxa
   if(mype==0) print *,'nlat,nlon=nya,nxa= ',nlat,nlon
+  if((real(nx)/real(nlon)/grid_ratio_fv3_regional>2)   &
+      .or.  (real(ny)/real(nlat)/grid_ratio_fv3_regional>2)  ) then
+   write(6,*)'Warning the actual grid raition is much bigger than expected on'
+  endif 
 
 !--------------------------obtain analysis grid spacing
   dlat=(maxval(gcrlat)-minval(gcrlat))/(ny-1)
@@ -767,14 +783,14 @@ subroutine fv3_h_to_ll(b_in,a,nb,mb,na,ma,rev_flg)
      do j=1,ma
         do i=1,na
            a(j,i)=fv3dx1(i,j)*(fv3dy1(i,j)*b(fv3ix (i,j),fv3jy(i,j))+fv3dy(i,j)*b(fv3ix (i,j),fv3jyp(i,j))) &
-              +fv3dx (i,j)*(fv3dy1(i,j)*b(fv3ixp(i,j),fv3jy(i,j))+fv3dy(i,j)*b(fv3ixp(i,j),fv3jyp(i,j)))
+                 +fv3dx (i,j)*(fv3dy1(i,j)*b(fv3ixp(i,j),fv3jy(i,j))+fv3dy(i,j)*b(fv3ixp(i,j),fv3jyp(i,j)))
         end do
      end do
   else  ! inverse-distance weighting average 
      do j=1,ma
         do i=1,na
-           a(j,i)=fv3dx(i,j)*b(fv3ix (i,j),fv3jy(i,j))+fv3dy(i,j)*b(fv3ix (i,j),fv3jyp(i,j)) &
-              +fv3dx1(i,j)*b(fv3ixp(i,j),fv3jy(i,j))+fv3dy1(i,j)*b(fv3ixp(i,j),fv3jyp(i,j))
+           a(j,i)=fv3dx(i,j) *b(fv3ix (i,j),fv3jy(i,j))+fv3dy (i,j)*b(fv3ix (i,j),fv3jyp(i,j)) &
+                 +fv3dx1(i,j)*b(fv3ixp(i,j),fv3jy(i,j))+fv3dy1(i,j)*b(fv3ixp(i,j),fv3jyp(i,j))
         end do
      end do
   endif
@@ -830,7 +846,7 @@ subroutine fv3_ll_to_h(a,b,nxa,nya,nxb,nyb,rev_flg)
         do j=1,nxb
            jr=nxbp-j
            b(jr+ijr)=a3dy1(i,j)*(a3dx1(i,j)*a(a3jy (i,j),a3ix(i,j))+a3dx(i,j)*a(a3jy (i,j),a3ixp(i,j))) &
-             +a3dy (i,j)*(a3dx1(i,j)*a(a3jyp(i,j),a3ix(i,j))+a3dx(i,j)*a(a3jyp(i,j),a3ixp(i,j)))
+                    +a3dy (i,j)*(a3dx1(i,j)*a(a3jyp(i,j),a3ix(i,j))+a3dx(i,j)*a(a3jyp(i,j),a3ixp(i,j)))
         end do
      end do
   else
@@ -839,7 +855,7 @@ subroutine fv3_ll_to_h(a,b,nxa,nya,nxb,nyb,rev_flg)
         ijr=(i-1)*nxb
         do j=1,nxb
            b(j+ijr)=a3dy1(i,j)*(a3dx1(i,j)*a(a3jy (i,j),a3ix(i,j))+a3dx(i,j)*a(a3jy (i,j),a3ixp(i,j))) &
-             +a3dy (i,j)*(a3dx1(i,j)*a(a3jyp(i,j),a3ix(i,j))+a3dx(i,j)*a(a3jyp(i,j),a3ixp(i,j)))
+                   +a3dy (i,j)*(a3dx1(i,j)*a(a3jyp(i,j),a3ix(i,j))+a3dx(i,j)*a(a3jyp(i,j),a3ixp(i,j)))
         end do
      end do
   endif

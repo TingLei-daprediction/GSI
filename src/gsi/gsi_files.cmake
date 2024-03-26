@@ -50,7 +50,29 @@ cplr_wrwrfnmma.f90
 )
 
 list(APPEND GSI_SRC_MGBF 
-     pre_multigrid.f90
+ jp_pbfil2.f90
+ jp_pbfil3.f90
+ jp_pbfil.f90
+ jp_pietc.f90
+ jp_pietc_s.f90
+ jp_pkind2.f90
+ jp_pkind.f90
+ jp_pmat4.f90
+ jp_pmat.f90
+ mg_bocos.f90   
+ mg_entrymod.f90
+ mg_generations.f90
+ mg_interpolate.f90
+ mg_mppstuff.f90 
+ mg_parameter.f90
+ mg_transfer.f90
+ mg_domain.f90
+ mg_filtering.f90  
+ mg_input.f90	     
+ mg_intstate.f90	 
+ mg_output.f90	  
+ mg_timers.f90
+ pre_multigrid.f90
      )
 list(APPEND GSI_SRC_main
 gsimain.f90

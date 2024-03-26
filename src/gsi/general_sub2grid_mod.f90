@@ -143,30 +143,31 @@ module general_sub2grid_mod
 
    type sub2grid_info
 
-      integer(i_kind):: inner_vars=0    ! number of inner-most loop variables
-      integer(i_kind):: lat1=0          ! no. of lats on subdomain (no buffer)
-      integer(i_kind):: lon1=0          ! no. of lons on subdomain (no buffer)
-      integer(i_kind):: lat2=0          ! no. of lats on subdomain (buffer)
-      integer(i_kind):: lon2=0          ! no. of lons on subdomain (buffer)
-      integer(i_kind):: latlon11=0      ! no. of points on subdomain (including buffer)
-      integer(i_kind):: latlon1n=0      ! latlon11*nsig
-      integer(i_kind):: nlat=0          ! no. of latitudes
-      integer(i_kind):: nlon=0          ! no. of longitudes
-      integer(i_kind):: nsig=0          ! no. of vertical levels
-      integer(i_kind):: num_fields=0    ! total number of fields/levels
-      integer(i_kind):: iglobal=0       ! number of horizontal points on global grid
-      integer(i_kind):: itotsub=0       ! number of horizontal points of all subdomains combined
-      integer(i_kind):: kbegin_loc=0    ! starting slab index for local processor
-      integer(i_kind):: kend_loc=0      ! ending slab index for local processor
-      integer(i_kind):: kend_alloc=0    ! kend_loc can = kbegin_loc - 1, for a processor not involved.
-                                        !  this causes problems with array allocation:
-                                        !  to correct this, use kend_alloc=max(kend_loc,kbegin_loc)
-      integer(i_kind):: nlevs_loc=0     ! number of active local levels ( = kend_loc-kbegin_loc+1)
-      integer(i_kind):: nlevs_alloc=0   ! number of allocatec local levels ( = kend_alloc-kbegin_loc+1)
-      integer(i_kind):: npe=0           ! total number of processors
-      integer(i_kind):: mype=-1         ! local processor
-      integer(i_kind):: nskip=0         ! # of processors skipped between full horizontal fields in grid mode.
-      logical:: periodic=.false.        ! logical flag for periodic e/w domains
+      integer(i_kind):: inner_vars=0      ! number of inner-most loop variables
+      integer(i_kind):: lat1=0            ! no. of lats on subdomain (no buffer)
+      integer(i_kind)::  lon1=0            ! no. of lons on subdomain (no buffer)
+      integer(i_kind):: lat2=0            ! no. of lats on subdomain (buffer)
+      integer(i_kind)::  lon2=0            ! no. of lons on subdomain (buffer)
+      integer(i_kind)::  latlon11=0        ! no. of points on subdomain (including buffer)
+      integer(i_kind)::  latlon1n=0        ! latlon11*nsig
+      integer(i_kind)::  nlat=0            ! no. of latitudes
+      integer(i_kind)::  nlon=0            ! no. of longitudes
+      integer(i_kind)::  nsig=0            ! no. of vertical levels
+      integer(i_kind)::  num_fields=0     ! total number of fields/levels
+      integer(i_kind)::  iglobal=0         ! number of horizontal points on global grid
+      integer(i_kind)::  itotsub=0         ! number of horizontal points of all subdomains combined
+      integer(i_kind)::  kbegin_loc=0     ! starting slab index for local processor
+      integer(i_kind)::  kend_loc=0        ! ending slab index for local processor
+      integer(i_kind)::  kend_alloc=0      ! kend_loc can = kbegin_loc - 1, for a processor not involved.
+                                      !  this causes problems with array allocation:
+                                      !  to correct this, use kend_alloc=max(kend_loc,kbegin_loc)
+      integer(i_kind)::  nlevs_loc=0       ! number of active local levels ( = kend_loc-kbegin_loc+1)
+      integer(i_kind)::  nlevs_alloc=0     ! number of allocatec local levels ( = kend_alloc-kbegin_loc+1)
+!TEST      integer(i_kind)::  npe=0             ! total number of processors
+      integer(i_kind)::  npe=1             ! total number of processors
+      integer(i_kind)::  mype=-1           ! local processor
+      integer(i_kind)::  nskip=0           ! # of processors skipped between full horizontal fields in grid mode.
+      logical::  periodic=.false.                ! logical flag for periodic e/w domains
       logical,pointer :: periodic_s(:) => null()    ! logical flag for periodic e/w subdomain (all tasks)
       logical,pointer :: vector(:)     => null()    ! logical flag, true for vector variables
       integer(i_kind),pointer :: ilat1(:)       => null()    !  no. of lats for each subdomain (no buffer)
@@ -320,6 +321,9 @@ module general_sub2grid_mod
       end if
 
 !      first determine subdomains
+!TEST
+!   print *,'BEFORE CALL to GENERAL_DETER_SUBDOMAIN'
+!TEST
       call general_deter_subdomain(s%npe,s%mype,s%nlat,s%nlon,regional, &
             s%periodic,s%periodic_s,s%lon1,s%lon2,s%lat1,s%lat2,s%ilat1,s%istart,s%jlon1,s%jstart)
       s%latlon11=s%lat2*s%lon2
@@ -441,6 +445,11 @@ module general_sub2grid_mod
             idoit(n)=1
          end do
       end if
+!TEST
+      print *,'npe_used=',npe_used
+      print *,'s%npe=',s%npe
+      print *,'s%nskip=',s%nskip
+!TEST
       allocate(s%kbegin(0:s%npe),s%kend(0:s%npe-1))
       num_loc_groups=s%num_fields/npe_used
       nextra=s%num_fields-num_loc_groups*npe_used
@@ -623,6 +632,9 @@ end subroutine get_iuse_pe
 !$$$
   use kinds, only: i_kind
   use mpimod, only: nxPE, nyPE
+!TEST
+!  use mg_parameter, only: nxm,mym
+!TEST
   use mpeu_util, only: die
   implicit none
 
@@ -634,20 +646,15 @@ end subroutine get_iuse_pe
   integer(i_kind),intent(  out) :: ilat1(npe),istart(npe),jlon1(npe),jstart(npe)
 
   character(len=*), parameter :: myname_='general_deter_subdomain'
-! integer(i_kind)  :: npe2,npsqrt
-
-! npe2=npe/2
-! npsqrt=sqrt(npe2)
-! if(2*npsqrt*npsqrt == npe)then
-!    nxpe=2*npsqrt
-!    nype=npsqrt
-!    if(mype == 0)write(6,*) ' using nxpe and nype in deter_subdomain ',nxpe,nype
-! end if
+!TEST
+    if(mype == 0)print *,   ' using nxpe and nype in deter_subdomain ',nxpe,nype
+    if(mype == 0)print *,   ' using NPE in deter_subdomain ',npe
+!TEST
 ! If a layout is provided, use it for the domain decomposition
 ! ------------------------------------------------------------
   if ( nxPE > 0 .AND. nyPE > 0 ) then
 
-     if( npe/=nxpe*nype ) then
+     if( npe/=nxPE*nyPE ) then
          call die(myname_,'NPE inconsistent from  NxPE NyPE ',npe)
      endif
      call general_deter_subdomain_withLayout(npe,nxPE,nyPE,mype,nlat,nlon,regional, &

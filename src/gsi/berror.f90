@@ -100,6 +100,8 @@ module berror
 !   def fpsproj   - controls full nsig projection onto surface pressure
 !   def bkgv_write- logical to turn on/off generation of binary file with reweighted variances
 !   def adjustozvar - adjust ozone variance in stratosphere based on guess field
+!   def multigrid_betafct - if true, then use multigrid code and beta functions
+!                           for the background convariance filtering
 !
 ! attributes:
 !   language: f90
@@ -133,6 +135,18 @@ module berror
   public :: bl,bl2,be,slw2,slw1,slw,mr,inaxs,wtxrs,wtaxs,nx,ny
   public :: inxrs,jj1,ii2,jj2,ii,jj,ii1,table,alv,nhscrf
   public :: cwcoveqqcov
+!MGBF
+  public :: multigrid_betafct
+  public :: mg_ampl01,mg_ampl02,mg_ampl03
+  public :: mg_weig1,mg_weig2,mg_weig3,mg_weig4
+  public :: hx_filt,hy_filt,hz_filt,p_filt
+  public :: mgbf_line,mgbf_proc
+  public :: lm_filt,lmf_filt,lmh_filt
+  public :: lquart,lhelm
+  public :: nm0_filt,mm0_filt
+  public :: nxm_filt,mym_filt,im_filt,jm_filt
+!MGBF
+
 
   integer(i_kind) norh,ndeg,nta,nlath
   integer(i_kind) nx,ny,mr,nr,nf,ndx,ndy,ndx2,nmix,nymx,norm,nxem,nfg,nfnf
@@ -156,6 +170,16 @@ module berror
   logical,save :: fpsproj
   logical,save :: fut2ps
   logical,save :: cwcoveqqcov
+!MGBF
+  logical multigrid_betafct
+  real(r_kind):: mg_ampl01,mg_ampl02,mg_ampl03
+  real(r_kind):: mg_weig1(8),mg_weig2(8),mg_weig3(8),mg_weig4(8)
+  integer(i_kind):: mgbf_proc,hx_filt,hy_filt,hz_filt,p_filt
+  integer(i_kind):: lm_filt,lmf_filt,lmh_filt
+  logical mgbf_line,lquart,lhelm
+  integer(i_kind):: nm0_filt,mm0_filt
+  integer(i_kind):: nxm_filt,mym_filt,im_filt,jm_filt
+!MGBF
 
 contains
 
@@ -208,6 +232,35 @@ contains
     fpsproj = .true.
     fut2ps = .false.
     cwcoveqqcov=.true.
+
+!MGBF
+    multigrid_betafct=.false.
+    mg_ampl01=2.
+    mg_ampl02=2.
+    mg_ampl03=2.
+    mg_weig1=10.
+    mg_weig2=10.
+    mg_weig3=10.
+    mg_weig4=10.
+!    nm0_filt = 1792
+!    mm0_filt = 1056
+!
+    nm0_filt = 900 !(=2*2*3*3*5*5)
+    mm0_filt = 540 !(=2*2*3*3*3*5)
+!
+    nxm_filt=9
+    mym_filt=9
+    im_filt =100
+    jm_filt =100
+    mgbf_line=.false.
+    mgbf_proc=2
+    lquart=.false.
+    lhelm=.false.
+    hx_filt=6
+    hy_filt=6
+    hz_filt=6
+    p_filt=2
+!MGBF
 
     do i=1,3
        hzscl(i)=one

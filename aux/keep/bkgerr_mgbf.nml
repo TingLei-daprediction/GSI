@@ -1,0 +1,112 @@
+ &BKGERR
+   vs=1.0,
+   hzscl=0.7,1.4,2.80,
+   bw=0.,fstat=.true.,
+   usenewgfsberror=.true.,
+!  multigrid_betafct=.false.,
+  multigrid_betafct=.true.,
+  mg_ampl01=.1,mg_ampl02=2.5,mg_ampl03=1.0,
+  mg_weig1=10.,mg_weig2=10.,mg_weig3=10.,mg_weig4=10.,
+  hx_filt=6,hy_filt=6,hz_filt=6,p_filt=2,
+!   mgbf_line=.false., mgbf_proc=1,
+  mgbf_line=.false., mgbf_proc=2,
+!   mgbf_line=.false., mgbf_proc=3,
+!   mgbf_line=.true.,  mgbf_proc=4,
+!   mgbf_line=.true.,  mgbf_proc=5,
+!   mgbf_line=.true.,  mgbf_proc=6,
+!   mgbf_line=.true.,  mgbf_proc=7,
+  lquart=.false., lhelm=.false.,
+  lm_filt=65,lmf_filt=65,lmh_filt=65,
+!  nm0_filt=1792,mm0_filt=1056,
+  nm0_filt=900,mm0_filt=540,
+!
+!  Note: for 4 generations make sure that:
+!
+!     if mod(nxm_filt,8)>0, mod(im_filt,8)=0
+!     if mod(mym_filt,8)>0, mod(jm_filt,8)=0
+!
+!FOR 168 PES:
+!   nxm_filt=14,mym_filt=12,im_filt=120,jm_filt=80,
+!   nxm_filt=14,mym_filt=12,im_filt=116,jm_filt=76,
+!   nxm_filt=14,mym_filt=12,im_filt=112,jm_filt=72,
+!------------- about 1536x960 filter grid ------
+!   nxm_filt=14,mym_filt=12,im_filt=108,jm_filt=80,
+!FOR 256 PES:
+!   nxm_filt=16,mym_filt=16,im_filt=112,jm_filt=64,
+!   nxm_filt=16,mym_filt=16,im_filt=96,jm_filt=64,
+!   nxm_filt=16,mym_filt=16,im_filt=92,jm_filt=60,
+!------------- about 1536x960 filter grid ------
+!   nxm_filt=16,mym_filt=16,im_filt=96,jm_filt=60,
+!FOR 336 PES:
+!   nxm_filt=28,mym_filt=12,im_filt=64,jm_filt=88,
+!   nxm_filt=28,mym_filt=12,im_filt=60,jm_filt=84,
+!   nxm_filt=28,mym_filt=12,im_filt=56,jm_filt=80,
+!------------- about 1536x960 filter grid ------
+!   nxm_filt=28,mym_filt=12,im_filt=56,jm_filt=80,
+!FOR 448 PES:
+!   nxm_filt=28,mym_filt=16,im_filt=64,jm_filt=64,
+!   nxm_filt=28,mym_filt=16,im_filt=60,jm_filt=60,
+!   nxm_filt=28,mym_filt=16,im_filt=56,jm_filt=56,
+!------------- about 1536x960 filter grid ------
+!   nxm_filt=28,mym_filt=16,im_filt=56,jm_filt=60,
+!FOR 512 PES:
+!   nxm_filt=32,mym_filt=16,im_filt=56,jm_filt=64,
+!   nxm_filt=32,mym_filt=16,im_filt=52,jm_filt=60,
+!   nxm_filt=32,mym_filt=16,im_filt=48,jm_filt=56,
+!------------- about 1536x960 filter grid ------
+!    nxm_filt=32,mym_filt=16,im_filt=48,jm_filt=60,
+!FOR 704 PES:
+    nxm_filt=32,mym_filt=22,im_filt=56,jm_filt=48,
+!    nxm_filt=32,mym_filt=22,im_filt=52,jm_filt=44,
+!    nxm_filt=32,mym_filt=22,im_filt=48,jm_filt=40,
+!------------- about 1536x960 filter grid ------
+!    nxm_filt=32,mym_filt=22,im_filt=48,jm_filt=44,
+!FOR 768 PES:   ! Does not work
+!   nxm_filt=32,mym_filt=24,im_filt=56,jm_filt=44,
+!   nxm_filt=32,mym_filt=24,im_filt=52,jm_filt=40,
+!   nxm_filt=32,mym_filt=24,im_filt=48,jm_filt=36,
+!------------- about 1536x960 filter grid ------
+!   nxm_filt=32,mym_filt=24,im_filt=48,jm_filt=40,
+!FOR 924 PES:
+!   nxm_filt=28,mym_filt=33,im_filt=64,jm_filt=32,
+!   nxm_filt=28,mym_filt=33,im_filt=60,jm_filt=28, 
+!   nxm_filt=28,mym_filt=33,im_filt=56,jm_filt=24,
+!------------- about 1536x960 filter grid ------
+!   nxm_filt=28,mym_filt=33,im_filt=56,jm_filt=28,  !Fail in pre_multigrid
+!   nxm_filt=28,mym_filt=33,im_filt=56,jm_filt=32,
+!FOR 1056 PES:
+!   nxm_filt=32,mym_filt=33,im_filt=56,jm_filt=32,
+!   nxm_filt=32,mym_filt=33,im_filt=52,jm_filt=28,
+!   nxm_filt=32,mym_filt=33,im_filt=48,jm_filt=24,
+!------------- about 1536x960 filter grid ------
+!   nxm_filt=32,mym_filt=33,im_filt=48,jm_filt=28,
+!FOR 1408 PES:
+!   nxm_filt=32,mym_filt=44,im_filt=56,jm_filt=24,
+!   nxm_filt=32,mym_filt=44,im_filt=52,jm_filt=20,
+!   nxm_filt=32,mym_filt=44,im_filt=48,jm_filt=16,
+!------------- about 1536x960 filter grid ------
+!   nxm_filt=32,mym_filt=44,im_filt=48,jm_filt=24,
+!FOR 1848 PES:
+!   nxm_filt=56,mym_filt=33,im_filt=32,jm_filt=32,
+!   nxm_filt=56,mym_filt=33,im_filt=28,jm_filt=28,
+!   nxm_filt=56,mym_filt=33,im_filt=24,jm_filt=24,
+!------------- about 1536x960 filter grid ------
+!   nxm_filt=56,mym_filt=33,im_filt=28,jm_filt=28,
+!FOR 2464 PES:
+!   nxm_filt=56,mym_filt=44,im_filt=32,jm_filt=24,
+!   nxm_filt=56,mym_filt=44,im_filt=28,jm_filt=20,
+!   nxm_filt=56,mym_filt=44,im_filt=24,jm_filt=16,
+!------------- about 1536x960 filter grid ------
+!   nxm_filt=56,mym_filt=44,im_filt=28,jm_filt=24,
+!FOR 2816 PES:
+!   nxm_filt=64,mym_filt=44,im_filt=28,jm_filt=24,
+!   nxm_filt=64,mym_filt=44,im_filt=24,jm_filt=20,
+!   nxm_filt=64,mym_filt=44,im_filt=24,jm_filt=16,
+!------------- about 1536x960 filter grid ------
+!   nxm_filt=64,mym_filt=44,im_filt=24,jm_filt=24,
+!FOR 4224 PES:
+!   nxm_filt=64,mym_filt=66,im_filt=28,jm_filt=16,
+!FOR 5632 PES:
+!   nxm_filt=64,nym=88,im_filt=28,jm_filt=12,
+!
+/

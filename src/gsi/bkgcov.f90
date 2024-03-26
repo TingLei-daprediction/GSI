@@ -43,6 +43,20 @@ subroutine bkgcov(cstate)
   use gsi_bundlemod, only: gsi_bundlegetpointer
   use general_sub2grid_mod, only: general_sub2grid,general_grid2sub
   use general_commvars_mod, only: s2g_raf
+!MGBF-MPondeca
+ use jfunc, only: iter,jiter,niter,miter           
+ use berror, only: multigrid_betafct,mgbf_proc   
+ use pre_multigrid, only: init_transf_flds,mk_transf_fields,destroy_transf_flds & 
+                         ,latdecomp12,londecomp12,mkgrads4ctrvec
+ use mpimod, only: IERROR
+!MGBF-MPondeca
+!MGBF-MRancic
+  use mg_transfer, only: anal_to_filt,filt_to_anal
+  use mg_filtering, only: mg_filtering_procedure
+  use mg_timers
+  use mg_mppstuff, only: finishMPI
+!MGBF-MRancic
+
   implicit none
 
 ! Passed Variables
@@ -52,6 +66,9 @@ subroutine bkgcov(cstate)
   integer(i_kind) n,n3d,istatus,nlevs
   real(r_kind),dimension(nlat*nlon*s2g_raf%nlevs_alloc):: hwork
   real(r_kind),pointer,dimension(:,:,:):: ptr3d=>NULL()
+!MGBF-MPondeca
+ integer(i_kind) mg_flag,graphics
+!MGBF-MPondeca
 
   nlevs=s2g_raf%nlevs_loc
   n3d=cstate%n3d
@@ -59,6 +76,63 @@ subroutine bkgcov(cstate)
 ! Multiply by background error variances, and break up skin temp
 ! into components
   call bkgvar(cstate,0)
+
+!MGBF
+
+if (multigrid_betafct) then   !MPondeca
+!M>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+                                                call btim(   mgbft_tim)
+!M>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+   if (jiter==1 .and. iter==0) then
+      call init_transf_flds(cstate) !get field names and global i,j dimensions
+!TEST
+!      if (mype==0) then
+!         print*,'show domain decomposition for generation 1 of multigrid'
+!         print*,'  task        i1        i2         j1       j2      npts'
+!         do n=1,npe
+!            print"(i5,2x,5(2x,i8))",n,latdecomp12(n,1),latdecomp12(n,2),&
+!                     londecomp12(n,1),londecomp12(n,2),&
+!                     (latdecomp12(n,2)-latdecomp12(n,1)+1)* &
+!                     (londecomp12(n,2)-londecomp12(n,1)+1)
+!         end do
+!      endif
+!      CALL MPI_FINALIZE(IERROR)  !MPondeca
+!      STOP                       !MPondeca
+!TEST
+   endif
+
+   call mk_transf_fields(cstate,0)  !get input gradient files in stacked format
+
+!****
+!****-----  Multigrid driver --------------
+!****
+        call anal_to_filt
+
+        call mg_filtering_procedure(mgbf_proc)
+
+        call filt_to_anal
+!****
+!****---------------------------------------
+!****
+
+   call mk_transf_fields(cstate,1)  !go from stacked format to bunder format
+!TEST
+!       call finishMPI
+!TEST
+
+!TEST   if (jiter==miter .and. iter==niter(jiter)) then
+!TEST      call destroy_transf_flds
+!TEST   endif
+!M>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+                                                call etim(   mgbft_tim)
+!M>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+   else
+
+!M>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+                                                call btim(   rfilt_tim)
+!M>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!MGBF
 
 ! Apply vertical smoother
 !$omp parallel do  schedule(dynamic,1) private(n,ptr3d,istatus)
@@ -82,6 +156,23 @@ subroutine bkgcov(cstate)
      call gsi_bundlegetpointer ( cstate,cstate%r3(n)%shortname,ptr3d,istatus )
      call frfhvo(ptr3d,n)
   end do
+
+!M>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+                                                call etim(   rfilt_tim)
+!M>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+     endif                       !MPondeca
+!GRAPHICS>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+  graphics=.false.
+!  graphics=.true.
+  if(graphics) then
+                                                call btim(   graph_tim)
+    call mkgrads4ctrvec(cstate)
+                                                call etim(   graph_tim)
+   CALL MPI_FINALIZE(IERROR)  
+   STOP                      
+  endif
+!GRAPHICS>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 ! Multiply by background error variances, and combine sst,sldnt, and sicet
 ! into skin temperature field
@@ -177,72 +268,72 @@ end subroutine ckgcov
 subroutine ckgcov_ad(z,cstate,nval_lenz)
 !$$$  subprogram documentation block
 !                .      .    .                                       .
-! subprogram:    ckgcov_ad  adjoint of ckgcov
-!   prgmmr: kleist         org: np22                date: 2004-07-22
-!
-! abstract: perform horizontal and vertical parts of background error
-!
-! program history log:
-!   2007-04-24  parrish
-!   2008-12-04  todling - turn sst,slndt,sicet to locals per GSI May08 
-!                         update to bkgcov above.
-!   2010-03-15  zhu - use nrf* and cstate for generalized control variable
-!                   - make changes to interface of sub2grid 
-!   2010-04-15  treadon - add %values to cstate in bkgvar call
-!   2010-04-28  todling - update to use gsi_bundle
-!   2011-06-29  todling - no explict reference to internal bundle arrays
-!   2011-09-05  todling - add explicit reference to navl_lenz, and remove connection through jfunc
-!   2012-06-25  parrish - replace sub2grid with general_sub2grid.
-!                         Remove arrays sst, slndt, sicet.  These are now contained as
-!                         motley variables in input/output bundle cstate.  Remove unused variables
-!                         nnnn1o,latlon11.
-!   2016-03-25  todling - revisit beta multiplier term
-!
-!   input argument list:
-!     z        - long vector adjoint input/output control fields
-!     cstate   - bundle containing control fields
-!     nlevs    - number of vertical levels for smoothing
-!     nval_lenz- length of sqrt-B control vector
-!
-!   output argument list:
-!                 all after smoothing, combining scales
-!     cstate   - bundle containing adjoint control fields
-!
-! attributes:
-!   language: f90
-!   machine:  ibm RS/6000 SP
-!$$$
-  use kinds, only: r_kind,i_kind
-  use constants, only: zero
-  use gridmod, only: nlat,nlon
-  use gsi_bundlemod, only: gsi_bundle
-  use gsi_bundlemod, only: gsi_bundlegetpointer
-  use general_sub2grid_mod, only: general_sub2grid
-  use general_commvars_mod, only: s2g_raf
-  use hybrid_ensemble_parameters, only: l_hyb_ens
-  use hybrid_ensemble_isotropic, only: sqrt_beta_s_mult
-  implicit none
+        ! subprogram:    ckgcov_ad  adjoint of ckgcov
+        !   prgmmr: kleist         org: np22                date: 2004-07-22
+        !
+        ! abstract: perform horizontal and vertical parts of background error
+        !
+        ! program history log:
+        !   2007-04-24  parrish
+        !   2008-12-04  todling - turn sst,slndt,sicet to locals per GSI May08 
+        !                         update to bkgcov above.
+        !   2010-03-15  zhu - use nrf* and cstate for generalized control variable
+        !                   - make changes to interface of sub2grid 
+        !   2010-04-15  treadon - add %values to cstate in bkgvar call
+        !   2010-04-28  todling - update to use gsi_bundle
+        !   2011-06-29  todling - no explict reference to internal bundle arrays
+        !   2011-09-05  todling - add explicit reference to navl_lenz, and remove connection through jfunc
+        !   2012-06-25  parrish - replace sub2grid with general_sub2grid.
+        !                         Remove arrays sst, slndt, sicet.  These are now contained as
+        !                         motley variables in input/output bundle cstate.  Remove unused variables
+        !                         nnnn1o,latlon11.
+        !   2016-03-25  todling - revisit beta multiplier term
+        !
+        !   input argument list:
+        !     z        - long vector adjoint input/output control fields
+        !     cstate   - bundle containing control fields
+        !     nlevs    - number of vertical levels for smoothing
+        !     nval_lenz- length of sqrt-B control vector
+        !
+        !   output argument list:
+        !                 all after smoothing, combining scales
+        !     cstate   - bundle containing adjoint control fields
+        !
+        ! attributes:
+        !   language: f90
+        !   machine:  ibm RS/6000 SP
+        !$$$
+          use kinds, only: r_kind,i_kind
+          use constants, only: zero
+          use gridmod, only: nlat,nlon
+          use gsi_bundlemod, only: gsi_bundle
+          use gsi_bundlemod, only: gsi_bundlegetpointer
+          use general_sub2grid_mod, only: general_sub2grid
+          use general_commvars_mod, only: s2g_raf
+          use hybrid_ensemble_parameters, only: l_hyb_ens
+          use hybrid_ensemble_isotropic, only: sqrt_beta_s_mult
+          implicit none
 
-! Passed Variables
-  integer(i_kind)    ,intent(in   ) :: nval_lenz
-  type(gsi_bundle),intent(inout) :: cstate
-  real(r_kind),dimension(nval_lenz),intent(inout) :: z
+        ! Passed Variables
+          integer(i_kind)    ,intent(in   ) :: nval_lenz
+          type(gsi_bundle),intent(inout) :: cstate
+          real(r_kind),dimension(nval_lenz),intent(inout) :: z
 
-! Local Variables
-  integer(i_kind) k,n3d,istatus,nlevs
-  real(r_kind),dimension(nlat*nlon*s2g_raf%nlevs_alloc):: hwork
-  real(r_kind),dimension(:,:,:),pointer:: ptr3d=>NULL()
+        ! Local Variables
+          integer(i_kind) k,n3d,istatus,nlevs
+          real(r_kind),dimension(nlat*nlon*s2g_raf%nlevs_alloc):: hwork
+          real(r_kind),dimension(:,:,:),pointer:: ptr3d=>NULL()
 
-  nlevs=s2g_raf%nlevs_loc
+          nlevs=s2g_raf%nlevs_loc
 
-! Apply static betas
-  if(l_hyb_ens) call sqrt_beta_s_mult(cstate)
+        ! Apply static betas
+          if(l_hyb_ens) call sqrt_beta_s_mult(cstate)
 
-! Multiply by background error variances, and break up skin temp
-! into components
-  call bkgvar(cstate,0)
+        ! Multiply by background error variances, and break up skin temp
+        ! into components
+          call bkgvar(cstate,0)
 
-! Apply vertical smoother
+        ! Apply vertical smoother
   n3d=cstate%n3d
 !$omp parallel do  schedule(dynamic,1) private(k,ptr3d,istatus)
   do k=1,n3d
