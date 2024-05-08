@@ -64,6 +64,26 @@ set_target_properties(mgbf PROPERTIES Fortran_MODULE_DIRECTORY "${module_dir}")
 target_include_directories(mgbf PUBLIC $<BUILD_INTERFACE:${module_dir}>
                                            $<INSTALL_INTERFACE:include/mgbf>)
 
+find_package(MPI REQUIRED)
+add_definitions(${MPI_Fortran_COMPILE_FLAGS})
+include_directories(${MPI_Fortran_INCLUDE_DIRS})
+link_directories(${MPI_Fortran_LIBRARY_DIRS})
+target_link_libraries(mgbf ${MPI_Fortran_LIBRARIES})
+
+if(MPI_EXTRA_LIBRARY)
+   target_link_libraries(mgbf ${MPI_EXTRA_LIBRARY})
+endif()
+
+get_target_property(CURRENT_LINK_FLAGS mgbf LINK_FLAGS)
+if(CURRENT_LINK_FLAGS)
+    set(MY_MPI_LINK_FLAGS "${CURRENT_LINK_FLAGS};${MPI_Fortran_LINK_FLAGS}")
+else()
+    set(MY_MPI_LINK_FLAGS "${MPI_Fortran_LINK_FLAGS}")
+endif()
+if(MY_MPI_LINK_FLAGS)
+   set_target_properties(mgbf PROPERTIES LINK_FLAGS ${MY_MPI_LINK_FLAGS})
+endif()
+
 install(DIRECTORY ${module_dir} DESTINATION ${CMAKE_INSTALL_PREFIX}/include)
 
 install(TARGETS mgbf
