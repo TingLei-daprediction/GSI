@@ -131,8 +131,11 @@ echo "module purge"                                        >> $cfile
 echo "module use $modulefiles"                      >> $cfile
 echo "module load gsi_orion.intel" >> $cfile
 echo "module list"                                         >> $cfile
+#echo "unset I_MPI_EXTRA_FILESYSTEM"         >> $cfile
 #TODO reenable I_MPI_EXTRA_FILESYSTEM once regional ctests can properly handle parallel I/O on Orion
-echo "unset I_MPI_EXTRA_FILESYSTEM"         >> $cfile
+echo "export I_MPI_EXTRA_FILESYSTEM=1"         >> $cfile
+#echo  I_MPI_EXTRA_FILESYSTEM is  $I_MPI_EXTRA_FILESYSTEM          
+#echo "echo  I_MPI_EXTRA_FILESYSTEM is  $I_MPI_EXTRA_FILESYSTEM " >> $cfile        
 
 cat $exec >> $cfile
 
@@ -155,6 +158,7 @@ elif [[ $verbose = YES ]];then
   set -x
   cat $cfile
 fi
+  cat $cfile  #clt
 sbatch=${sbatch:-sbatch}
 
 ofile=$DATA/subout$$
