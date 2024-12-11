@@ -152,6 +152,7 @@
       end do ! while ireadmg
 
       allocate(cdata_all(nreal,maxobs))
+      cdata_all=zero
       nread=0
       nchanl=0
       ilon=2

@@ -292,6 +292,7 @@ subroutine read_avhrr(mype,val_avhrr,ithin,rmesh,jsatid,&
 
      if ( imesh == 1 ) then
         allocate( data_all(nele,itxmax) )
+        data_all=zero
      endif
 
      open(lnbufr,file=trim(infile),form='unformatted')         ! open bufr data file

@@ -82,6 +82,7 @@ subroutine read_tcps(nread,ndata,nodata,infile,obstype,lunout,sis,nobs)
   endfile=.false.
 
   allocate(cdata_all(maxdat,maxobs))
+  cdata_all=zero
 
   open(lunin,file=trim(infile),form='formatted',action='read')
   call datelen(10)

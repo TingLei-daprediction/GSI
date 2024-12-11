@@ -99,6 +99,7 @@ subroutine  read_NASA_LaRC_cloud(nread,ndata,nouse,infile,obstype,lunout,sis,nob
   !maxobs=(1800*700 + 1500*850)*1
   maxobs=(12250000)
   allocate(cdata_all(maxdat,maxobs))
+  cdata_all=zero
   !satfile='lgycldbufr'
   satfile=trim(infile)
   allocate(lat_l(maxobs))

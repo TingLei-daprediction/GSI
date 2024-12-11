@@ -489,6 +489,7 @@ subroutine read_bufrtovs(mype,val_tovs,ithin,isfcalc,&
   hdr1b ='SAID FOVN YEAR MNTH DAYS HOUR MINU SECO CLAT CLON CLATH CLONH HOLS SACV'
   hdr2b ='SAZA SOZA BEARAZ SOLAZI'
   allocate(data_all(nele,itxmax),data1b8(nchanl),data1b4(nchanl),nrec(itxmax))
+  data_all=zero
 
 
   next=0

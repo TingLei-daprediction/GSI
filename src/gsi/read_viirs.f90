@@ -238,6 +238,7 @@ subroutine read_sst_viirs(mype,val_viirs,ithin,rmesh,jsatid,&
 
      if ( imesh == 1 ) then
         allocate( data_all(nele,itxmax) )
+        data_all=zero
      endif
 
      open(lnbufr,file=trim(infile),form='unformatted')         ! open bufr data file

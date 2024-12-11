@@ -271,6 +271,7 @@ subroutine read_goesndr(mype,val_goes,ithin,rmesh,jsatid,infile,&
   nreal  = maxinfo + nstinfo
   nele   = nreal   + nchanl
   allocate(data_all(nele,itxmax),nrec(itxmax))
+  data_all=zero
 
 ! Big loop to read data file
   nrec=999999

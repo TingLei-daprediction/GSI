@@ -488,6 +488,7 @@ integer(i_kind),dimension(npe)  ,intent(inout) :: nobs
   nreal  = maxinfo + nstinfo
   nele   = nreal   + nchanl
   allocate(data_all(nele,itxmax),nrec(itxmax))
+  data_all=zero
 
   nrec=999999
   obsloop: do iobs = 1, num_obs

@@ -350,6 +350,7 @@ subroutine read_amsre(mype,val_amsre,ithin,isfcalc,rmesh,jsatid,gstime,&
 ! Allocate local array to contain observation information
   nele=nreal+nchanl
   allocate(data_all(nele,itxmax),nrec(itxmax))
+  data_all=zero
 
 ! Big loop to read data file
   next=0

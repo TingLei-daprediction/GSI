@@ -269,6 +269,7 @@ subroutine read_radar_wind_ascii(nread,ndata,nodata,infile,lunout,obstype,sis,hg
   !--Allocate cdata_all array
 
   allocate(cdata_all(maxdat,maxobs),rusage(maxobs),rthin(maxobs))
+  cdata_all=zero
 
 
   rmesh=rmesh_vr

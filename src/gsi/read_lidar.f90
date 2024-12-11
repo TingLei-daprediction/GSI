@@ -142,6 +142,7 @@ subroutine read_lidar(nread,ndata,nodata,infile,obstype,lunout,twind,sis,nobs)
   endif
 
   allocate(cdata_all(maxdat,maxobs))
+  cdata_all=zero
 
 
 ! Time offset

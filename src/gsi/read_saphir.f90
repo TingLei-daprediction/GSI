@@ -402,6 +402,7 @@ subroutine read_saphir(mype,val_tovs,ithin,isfcalc,&
   nreal = maxinfo + nstinfo
   nele  = nreal   + nchanl
   allocate(data_all(nele,itxmax),nrec(itxmax))
+  data_all=zero
 
   nrec=999999
   ObsLoop: do iob = 1, num_obs  

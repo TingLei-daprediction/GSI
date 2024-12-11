@@ -243,6 +243,7 @@ subroutine read_satmar (nread, ndata, nodata,                                 &
 !
 ! Allocate Arrays for all the data
    allocate (data_all (nreal, cnt),rusage(cnt),rthin(cnt))
+   data_all=zero
 !
 !  Loop over file
    open(lun11,file=trim(infile),action='read',form='unformatted')
