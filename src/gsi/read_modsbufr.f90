@@ -142,7 +142,7 @@ subroutine read_modsbufr(nread,ndata,nodata,gstime,infile,obstype,lunout, &
   nreal=maxinfo+nstinfo
 
   allocate(data_all(nreal,maxobs))
-  data_all = zero
+  data_all=zero
 
 
   if(oberrflg)then

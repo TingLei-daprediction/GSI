@@ -265,6 +265,7 @@ real(r_single), allocatable :: obdata_nc(:,:)
   !--Allocate cdata_all array
 
   allocate(cdata_all(maxdat,maxobs))
+  cdata_all=zero
        
   lunrad=31
 ! get the time from the file name

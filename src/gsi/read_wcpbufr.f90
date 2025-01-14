@@ -300,6 +300,7 @@ subroutine read_wcpbufr(nread,ndata,nodata,infile,obstype,lunout,twindin,sis,&
 ! loop over convinfo file entries; operate on matches
   
   allocate(cdata_all(nreal,maxobs),rusage(maxobs),rthin(maxobs))
+  cdata_all=zero
   nread=0
   ntest=0
   nvtest=0

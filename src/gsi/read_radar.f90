@@ -361,6 +361,7 @@ subroutine read_radar(nread,ndata,nodata,infile,lunout,obstype,twind,sis,hgtl_fu
   end if
 
   allocate(cdata_all(maxdat,maxobs),rusage(maxobs),rthin(maxobs))
+  cdata_all=zero
 
   rusage=.true.
   rthin=.false.

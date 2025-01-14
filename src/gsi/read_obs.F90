@@ -1956,7 +1956,7 @@ subroutine read_obs(ndata,mype)
 !   Deallocate arrays containing full horizontal surface fields
     call destroy_sfc
 !   Sum and distribute number of obs read and used for each input ob group
-    
+    write(6,*)'thinkdebndate3 is ',ndat 
     call mpi_allreduce(ndata1,ndata,ndat*3,mpi_integer,mpi_sum,mpi_comm_world,&
        ierror)
 

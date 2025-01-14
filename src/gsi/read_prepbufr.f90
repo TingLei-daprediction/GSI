@@ -900,6 +900,7 @@ subroutine read_prepbufr(nread,ndata,nodata,infile,obstype,lunout,twindin,sis,&
 ! loop over convinfo file entries; operate on matches
   
   allocate(cdata_all(nreal,maxall),rusage(maxall),rthin(maxall))
+  cdata_all=zero
   nread=0
   ntest=0
   nvtest=0

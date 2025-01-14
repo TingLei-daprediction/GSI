@@ -329,6 +329,7 @@ subroutine read_sfcwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
 ! Loop over convinfo file entries; operate on matches
 
   allocate(cdata_all(nreal,maxobs),rusage(maxobs),rthin(maxobs))
+  cdata_all=zero
   nread=0
   ntest=0
   nvtest=0

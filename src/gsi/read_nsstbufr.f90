@@ -147,6 +147,7 @@ subroutine read_nsstbufr(nread,ndata,nodata,gstime,infile,obstype,lunout, &
   nreal=maxinfo+nstinfo
 
   allocate(data_all(nreal,maxobs))
+  data_all=zero
 
 
   if(oberrflg)then

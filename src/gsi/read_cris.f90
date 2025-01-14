@@ -449,6 +449,7 @@ subroutine read_cris(mype,val_cris,ithin,isfcalc,rmesh,jsatid,gstime,&
 ! The number of channels is obtained from the satinfo file being used.
   nele=nreal+satinfo_nchan
   allocate(data_all(nele,itxmax),nrec(itxmax))
+  data_all=zero
   allocate(temperature(1))   ! actual values set after ireadsb
   allocate(allchan(2,1))     ! actual values set after ireadsb
   allocate(bufr_chan_test(1))! actual values set after ireadsb

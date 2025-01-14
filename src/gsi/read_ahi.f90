@@ -216,6 +216,7 @@ subroutine read_ahi(mype,val_img,ithin,rmesh,jsatid,gstime,&
   nreal = maxinfo + nstinfo
   nele  = nreal   + nchanl
   allocate(data_all(nele,itxmax),nrec(itxmax))
+  data_all=zero
 
   call closbf(lnbufr)
   close(lnbufr)

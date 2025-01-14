@@ -220,6 +220,7 @@ subroutine read_dbz_nc(nread,ndata,nodata,infile,lunout,obstype,sis,hgtl_full,no
 
   !--Allocate cdata_all array
   allocate(cdata_all(maxdat,maxobs),rthin(maxobs),rusage(maxobs))
+  cdata_all=zero
   rmesh=rmesh_dbz
   zmesh=zmesh_dbz
 

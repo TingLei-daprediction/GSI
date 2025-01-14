@@ -387,6 +387,7 @@ subroutine read_fl_hdob(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,si
 
 !    Allocate array to hold data
      allocate(cdata_all(nreal,maxobs),rusage(maxobs),rthin(maxobs))
+     cdata_all=zero
 
 !    Initialize
      cdata_all = zero 

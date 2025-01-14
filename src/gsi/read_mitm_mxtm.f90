@@ -223,6 +223,7 @@ subroutine read_mitm_mxtm(nread,ndata,nodata,infile,obstype,lunout,gstime,sis,no
   end if
 
   allocate(cdata_all(nreal,maxobs))
+  cdata_all=zero
 
   kxall=0
   iout=0

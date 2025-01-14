@@ -606,6 +606,7 @@ subroutine read_ssmis(mype,val_ssmis,ithin,isfcalc,rmesh,jsatid,gstime,&
   nreal  = maxinfo + nstinfo
   nele   = nreal   + nchanl
   allocate(data_all(nele,itxmax),nrec(itxmax)) 
+  data_all=zero
 
   nrec=999999  
   obsloop: do iobs = 1, num_obs

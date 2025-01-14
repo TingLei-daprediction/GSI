@@ -594,6 +594,7 @@ subroutine read_gmi(mype,val_gmi,ithin,rmesh,jsatid,gstime,&
   nreal  = maxinfo + nstinfo
   nele   = nreal   + nchanl
   allocate(data_all(nele,itxmax),nrec(itxmax))
+  data_all=zero
 
   nrec=999999
   if (mype==0) write(*,*) 'read_gmi num_obs before thinning: ', num_obs

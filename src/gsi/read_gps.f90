@@ -201,6 +201,7 @@ subroutine read_gps(nread,ndata,nodata,infile,lunout,obstype,twind, &
 
 ! Allocate work array to hold observations
   allocate(cdata_all(nreal,maxobs))
+  cdata_all=zero
 
 ! Big loop over the bufr file
 

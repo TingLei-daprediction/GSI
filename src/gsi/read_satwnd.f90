@@ -662,6 +662,7 @@ subroutine read_satwnd(nread,ndata,nodata,infile,obstype,lunout,gstime,twind,sis
   ilon=2
   ilat=3
   allocate(cdata_all(nreal,maxobs),rthin(maxobs),rusage(maxobs))
+  cdata_all=zero
   rusage = .true.
   rthin = .false.
 

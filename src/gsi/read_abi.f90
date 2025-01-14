@@ -227,6 +227,7 @@ subroutine read_abi(mype,val_abi,ithin,rmesh,jsatid,&
   nreal = maxinfo + nstinfo
   nele  = nreal   + nchanl
   allocate(data_all(nele,itxmax),nrec(itxmax))
+  data_all=zero
 
 
 !  Reopen unit to bufr file

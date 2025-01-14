@@ -72,8 +72,8 @@ case $regtest in
            topts[1]="0:10:00" ; popts[1]="18/8/" ; ropts[1]="/1"
            topts[2]="0:10:00" ; popts[2]="18/10/" ; ropts[2]="/2"
         elif [[ "$machine" = "wcoss2" ]]; then
-           topts[1]="0:10:00" ; popts[1]="12/8/" ; ropts[1]="/1"
-           topts[2]="0:10:00" ; popts[2]="12/10/" ; ropts[2]="/2"
+           topts[1]="1:10:00" ; popts[1]="12/8/" ; ropts[1]="/1"
+           topts[2]="1:10:00" ; popts[2]="12/10/" ; ropts[2]="/2"
         fi
 
         if [ "$debug" = ".true." ] ; then
@@ -102,8 +102,8 @@ case $regtest in
            topts[1]="0:15:00" ; popts[1]="18/1/"  ; ropts[1]="/1"
            topts[2]="0:15:00" ; popts[2]="18/2/"  ; ropts[2]="/1"
         elif [[ "$machine" = "wcoss2" ]]; then
-           topts[1]="0:15:00" ; popts[1]="64/1/" ; ropts[1]="/1"
-           topts[2]="0:15:00" ; popts[2]="128/2/" ; ropts[2]="/1"
+           topts[1]="1:15:00" ; popts[1]="64/1/" ; ropts[1]="/1"
+           topts[2]="1:15:00" ; popts[2]="128/2/" ; ropts[2]="/1"
         fi
 
         if [ "$debug" = ".true." ] ; then
@@ -132,8 +132,8 @@ case $regtest in
            topts[1]="0:15:00" ; popts[1]="18/1/"  ; ropts[1]="/1"
            topts[2]="0:15:00" ; popts[2]="18/2/"  ; ropts[2]="/1"
         elif [[ "$machine" = "wcoss2" ]]; then
-           topts[1]="0:15:00" ; popts[1]="64/1/" ; ropts[1]="/1"
-           topts[2]="0:15:00" ; popts[2]="128/2/" ; ropts[2]="/1"
+           topts[1]="1:15:00" ; popts[1]="64/1/" ; ropts[1]="/1"
+           topts[2]="1:15:00" ; popts[2]="128/2/" ; ropts[2]="/1"
         fi
 
         if [ "$debug" = ".true." ] ; then
@@ -161,8 +161,8 @@ case $regtest in
            topts[1]="0:15:00" ; popts[1]="18/1/"  ; ropts[1]="/1"
            topts[2]="0:15:00" ; popts[2]="18/2/"  ; ropts[2]="/1"
         elif [[ "$machine" = "wcoss2" ]]; then
-           topts[1]="0:15:00" ; popts[1]="64/1/" ; ropts[1]="/1"
-           topts[2]="0:15:00" ; popts[2]="128/2/" ; ropts[2]="/1"
+           topts[1]="1:15:00" ; popts[1]="64/1/" ; ropts[1]="/1"
+           topts[2]="1:15:00" ; popts[2]="128/2/" ; ropts[2]="/1"
         fi
 
         if [ "$debug" = ".true." ] ; then
@@ -191,8 +191,8 @@ case $regtest in
            topts[1]="0:15:00" ; popts[1]="4/4/"  ; ropts[1]="/1"
            topts[2]="0:15:00" ; popts[2]="6/6/"  ; ropts[2]="/1"
         elif [[ "$machine" = "wcoss2" ]]; then
-           topts[1]="0:15:00" ; popts[1]="28/1/" ; ropts[1]="/1"
-           topts[2]="0:15:00" ; popts[2]="28/2/" ; ropts[2]="/1"
+           topts[1]="1:15:00" ; popts[1]="28/1/" ; ropts[1]="/1"
+           topts[2]="1:15:00" ; popts[2]="28/2/" ; ropts[2]="/1"
         fi
 
         if [ "$debug" = ".true." ] ; then
@@ -221,8 +221,8 @@ case $regtest in
            topts[1]="0:30:00" ; popts[1]="8/6/"  ; ropts[1]="/1"
            topts[2]="0:30:00" ; popts[2]="8/8/"  ; ropts[2]="/1"
         elif [[ "$machine" = "wcoss2" ]]; then
-           topts[1]="0:30:00" ; popts[1]="14/8/" ; ropts[1]="/1"
-           topts[2]="0:30:00" ; popts[2]="14/14/" ; ropts[2]="/2"
+           topts[1]="1:30:00" ; popts[1]="14/8/" ; ropts[1]="/1"
+           topts[2]="1:30:00" ; popts[2]="14/14/" ; ropts[2]="/2"
         fi
 
         if [ "$debug" = ".true." ] ; then
@@ -251,8 +251,8 @@ case $regtest in
            topts[1]="0:10:00" ; popts[1]="12/3/" ; ropts[1]="/1"
            topts[2]="0:10:00" ; popts[2]="12/5/" ; ropts[2]="/2"
         elif [[ "$machine" = "wcoss2" ]]; then
-           topts[1]="0:10:00" ; popts[1]="16/2/" ; ropts[1]="/1"
-           topts[2]="0:10:00" ; popts[2]="16/4/" ; ropts[2]="/2"
+           topts[1]="1:10:00" ; popts[1]="16/2/" ; ropts[1]="/1"
+           topts[2]="1:10:00" ; popts[2]="16/4/" ; ropts[2]="/2"
         fi
 
         if [ "$debug" = ".true." ] ; then
