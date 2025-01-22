@@ -445,7 +445,8 @@ subroutine intrad_(radhead,rval,sval,rpred,spred)
      enddo
 
      tdir=zero
-!$omp parallel do schedule(dynamic,1) private(k,i1,i2,i3,i4)
+!clt     #!$omp parallel do schedule(dynamic,1) private(k,i1,i2,i3,i4)
+!$omp parallel do schedule(static,1) private(k,i1,i2,i3,i4)
      do k=1,nsig
         i1 = i1n(k)
         i2 = i2n(k)
@@ -514,7 +515,8 @@ subroutine intrad_(radhead,rval,sval,rpred,spred)
 
      if (.not. ladtest_obs) then
         allocate(biasvect(radptr%nchan))
-!$omp parallel do schedule(dynamic,1) private(nn,n,ic1,ix1,val_quad)
+!clt !$omp parallel do schedule(dynamic,1) private(nn,n,ic1,ix1,val_quad)
+!$omp parallel do schedule(static,1) private(nn,n,ic1,ix1,val_quad)
         do nn=1,radptr%nchan
           ic1=radptr%icx(nn)
           ix1=(ic1-1)*npred
@@ -526,7 +528,8 @@ subroutine intrad_(radhead,rval,sval,rpred,spred)
         end do
      end if
 
-!$omp parallel do schedule(dynamic,1) private(nn,k,ncr1,val_quad,mm)
+!clt !$omp parallel do schedule(dynamic,1) private(nn,k,ncr1,val_quad,mm)
+!$omp parallel do schedule(static,1) private(nn,k,ncr1,val_quad,mm)
      do nn=1,radptr%nchan
 
 !       include observation increment and lapse rate contributions to bias correction
@@ -567,7 +570,8 @@ subroutine intrad_(radhead,rval,sval,rpred,spred)
 
      if (l_do_adjoint) then
         if (.not. lsaveobsens) then
-!$omp parallel do schedule(dynamic,1) private(nn,ic,cg_rad,wnotgross,wgross,p0)
+!clt !$omp parallel do schedule(dynamic,1) private(nn,ic,cg_rad,wnotgross,wgross,p0)
+!$omp parallel do schedule(static,1) private(nn,ic,cg_rad,wnotgross,wgross,p0)
            do nn=1,radptr%nchan
               ic=radptr%icx(nn)
               if( .not. ladtest_obs)   val(nn)=val(nn)-radptr%res(nn)
@@ -591,7 +595,8 @@ subroutine intrad_(radhead,rval,sval,rpred,spred)
         if( .not. ladtest_obs) then
           if(radptr%luse)then
             if (radptr%use_corr_obs) then
-!$omp parallel do schedule(dynamic,1) private(n,nn,ix,ncr1,ncr2,mm)
+!clt !$omp parallel do schedule(dynamic,1) private(n,nn,ix,ncr1,ncr2,mm)
+!$omp parallel do schedule(static,1) private(n,nn,ix,ncr1,ncr2,mm)
               do nn=1,radptr%nchan
                 ncr1 = radptr%iccerr(nn)+nn
                 ncr2 = ncr1
@@ -607,7 +612,8 @@ subroutine intrad_(radhead,rval,sval,rpred,spred)
                 enddo
               enddo
             else
-!$omp parallel do schedule(dynamic,1) private(n,nn,ix)
+!clt !$omp parallel do schedule(dynamic,1) private(n,nn,ix)
+!$omp parallel do schedule(static,1) private(n,nn,ix)
               do nn=1,radptr%nchan
                  ix=(radptr%icx(nn)-1)*npred
                  do n=1,npred
@@ -622,7 +628,8 @@ subroutine intrad_(radhead,rval,sval,rpred,spred)
 
 
 !          Begin adjoint
-!$omp parallel do schedule(dynamic,1) private(k,nn)
+!clt !$omp parallel do schedule(dynamic,1) private(k,nn)
+!$omp parallel do schedule(static,1) private(k,nn)
         do k=1,nsigradjac
            tval(k)=zero
 
@@ -635,7 +642,8 @@ subroutine intrad_(radhead,rval,sval,rpred,spred)
 
 !    Distribute adjoint contributions over surrounding grid points
  
-!$omp parallel do schedule(dynamic,1) private(k,i1,i2,i3,i4,mm)
+!clt !$omp parallel do schedule(dynamic,1) private(k,i1,i2,i3,i4,mm)
+!$omp parallel do schedule(static,1) private(k,i1,i2,i3,i4,mm)
         do k=1,nsig
            i1 = i1n(k)
            i2 = i2n(k)

@@ -1100,7 +1100,8 @@ contains
 
         predbias=zero
 
-!$omp parallel do  schedule(dynamic,1) private(i,mm,j,k,tlap,node,bias)
+!clt !$omp parallel do  schedule(dynamic,1) private(i,mm,j,k,tlap,node,bias)
+!$omp parallel do  schedule(static,1) private(i,mm,j,k,tlap,node,bias)
         do i=1,nchanl
            mm=ich(i)
 
@@ -1218,7 +1219,8 @@ contains
 
         kmax = 0
         if (lwrite_peakwt .or. passive_bc) then
-!$omp parallel do  schedule(dynamic,1) private(i,k,ptau5derivmax,ptau5deriv)
+!clt !$omp parallel do  schedule(dynamic,1) private(i,k,ptau5derivmax,ptau5deriv)
+!$omp parallel do  schedule(static,1) private(i,k,ptau5derivmax,ptau5deriv)
            do i=1,nchanl
               ptau5derivmax = -9.9e31_r_kind
 ! maximum of weighting function is level at which transmittance
@@ -1244,7 +1246,8 @@ contains
         cld_rbc_idx2=zero
         if (radmod%lcloud_fwd .and. radmod%ex_biascor .and. eff_area) then
            ierrret=0
-!$omp parallel do  schedule(dynamic,1) private(i,mm,j)
+!clt !$omp parallel do  schedule(dynamic,1) private(i,mm,j)
+!$omp parallel do  schedule(static,1) private(i,mm,j)
            do i=1,nchanl
               mm=ich(i)
               tsim_bc(i)=tsim(i)
@@ -1784,7 +1787,8 @@ contains
         account_for_corr_obs = .false.
         varinv0=zero
         raterr2 = zero
-!$omp parallel do  schedule(dynamic,1) private(ii,m,k,asum)
+!clt !$omp parallel do  schedule(dynamic,1) private(ii,m,k,asum)
+!$omp parallel do  schedule(static,1) private(ii,m,k,asum)
         do ii=1,nchanl
            m=ich(ii)
            if (varinv(ii)>tiny_r_kind .and. iuse_rad(m)>=1) then

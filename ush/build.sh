@@ -6,8 +6,8 @@ set -eux
 readonly DIR_ROOT=$(cd "$(dirname "$(readlink -f -n "${BASH_SOURCE[0]}" )" )/.." && pwd -P)
 
 # User Options
-#ctlBUILD_TYPE=${BUILD_TYPE:-"Release"}
-BUILD_TYPE=${BUILD_TYPE:-"Debug"}
+BUILD_TYPE=${BUILD_TYPE:-"Release"}
+#BUILD_TYPE=${BUILD_TYPE:-"Debug"}
 CMAKE_OPTS=${CMAKE_OPTS:-}
 COMPILER=${COMPILER:-"intel"}
 BUILD_DIR=${BUILD_DIR:-"${DIR_ROOT}/build"}
@@ -31,7 +31,7 @@ set -x
 
 # Set CONTROLPATH variable to user develop installation
 #clt CONTROLPATH="$DIR_ROOT/../develop/install/bin"
-CONTROLPATH="/lfs/h2/emc/da/noscrub/Ting.Lei/dr-emc-gsi-release/GSI/install/bin"
+CONTROLPATH="/lfs/h2/emc/da/noscrub/Ting.Lei/dr-fork-gsi-release/GSI/install/bin"
 # Collect BUILD Options
 CMAKE_OPTS+=" -DCMAKE_BUILD_TYPE=$BUILD_TYPE"
 

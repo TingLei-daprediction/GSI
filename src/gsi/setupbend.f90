@@ -475,7 +475,8 @@ subroutine setupbend(obsLL,odiagLL, &
      top_layer_SR=0
      bot_layer_SR=0
 
-!$omp parallel do  schedule(dynamic,1) private(k,qmean,tmean,fact,pw,pressure,nrefges1,nrefges2,nrefges3)
+!clt     !$omp parallel do  schedule(dynamic,1) private(k,qmean,tmean,fact,pw,pressure,nrefges1,nrefges2,nrefges3)
+!$omp parallel do  schedule(static,1) private(k,qmean,tmean,fact,pw,pressure,nrefges1,nrefges2,nrefges3)
      do k=1,nsig 
         zges(k) = (termr*hges(k)) / (termrg-hges(k))  ! eq (23) at interface (topo corrected)
         gp2gm(k,i)= termr/(termrg-hges(k))+((termr*hges(k))/(termrg-hges(k))**2)
