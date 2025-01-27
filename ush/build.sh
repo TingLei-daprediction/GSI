@@ -30,7 +30,6 @@ module list
 set -x
 
 # Set CONTROLPATH variable to user develop installation
-#clt CONTROLPATH="$DIR_ROOT/../develop/install/bin"
 CONTROLPATH="/lfs/h2/emc/da/noscrub/Ting.Lei/dr-fork-gsi-release/GSI/install/bin"
 # Collect BUILD Options
 CMAKE_OPTS+=" -DCMAKE_BUILD_TYPE=$BUILD_TYPE"
