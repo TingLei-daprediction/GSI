@@ -814,6 +814,10 @@ subroutine read_iasi(mype,val_iasi,ithin,isfcalc,rmesh,jsatid,gstime,&
              call ufbseq(lnbufr,imager_info,33,7,iret,'IASIL1CS')
              if (iret == 7 .and. imager_info(3,1) <= 100.0_r_kind .and. &
                   imager_info(3,1) >= zero .and. imager_coeff ) then   ! if imager cluster info exists
+               if(any(imager_info(26,:)<0.01)) then 
+                  write(6,*)"thinkdeb wrong in read_iasi radian <0"
+                  write(6,*)"thinkdeb ,imager_info is ",imager_info(26,:)
+               endif
                imager_mean = zero
                imager_std_dev = zero
                imager_cluster_tot = zero
