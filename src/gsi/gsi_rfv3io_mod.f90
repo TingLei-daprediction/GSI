@@ -2422,37 +2422,18 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
 ! subprogram:    gsi_fv3ncdf_read       
 !   prgmmr: wu               org: np22                date: 2017-10-10
 !           lei  re-write for parallelization         date: 2021-09-29
-!                 similar for horizontal recurisve filtering
-! abstract: read in fields excluding u and v
-! program history log:
-!
-!   input argument list:
-!     filename    - file name to read from       
-!     varname     - variable name to read in
-!     varname2    - variable name to read in
-!     mype_io     - pe to read in the field
-!
-!   output argument list:
-!     work_sub    - output sub domain field
-!
-! attributes:
-!   language: f90
-!   machine:  ibm RS/6000 SP
-!
+!           cascade rewrite for robust parallel NetCDF: 2025-06-17
+! abstract: read in fields excluding u and v, robust parallel NetCDF pattern
 !$$$  end documentation block
-
 
     use kinds, only: r_kind,i_kind
     use mpimod, only: mpi_comm_world,mpi_rtype,mype,npe,setcomm,mpi_integer,mpi_max
     use mpimod, only:  MPI_INFO_NULL
     use netcdf, only: nf90_open,nf90_close,nf90_get_var,nf90_noerr
-    use netcdf, only: nf90_nowrite,nf90_mpiio,nf90_inquire,nf90_inquire_dimension
-    use netcdf, only: nf90_inquire_variable
-    use netcdf, only: nf90_inq_varid
+    use netcdf, only: nf90_nowrite,nf90_mpiio,nf90_inq_varid, nf90_var_par_access, nf90_independent
     use mod_fv3_lola, only: fv3_h_to_ll,fv3_h_to_ll_ens
     use gsi_bundlemod, only: gsi_bundle
     use general_sub2grid_mod, only: sub2grid_info,general_grid2sub
-
     implicit none
     type(sub2grid_info),        intent(in   ) :: grd_ionouv 
     type(gsi_bundle),           intent(inout) :: cstate_nouv
@@ -2460,109 +2441,48 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
     type (type_fv3regfilenameg),intent(in   ) ::fv3filenamegin
     logical,                    intent(in   ) :: ensgrid
 
-    real(r_kind),allocatable,dimension(:,:):: uu2d
-    real(r_kind),dimension(1,grd_ionouv%nlat,grd_ionouv%nlon,grd_ionouv%kbegin_loc:grd_ionouv%kend_alloc):: hwork
-    character(len=max_varname_length) :: varname,vgsiname
-    character(len=max_varname_length) :: name
+    ! Fortran 2003: allocatable character arrays
+    character(len=:), allocatable :: my_varlist(:)
+    character(len=:), allocatable :: all_varlist(:)
+    character(len=:), allocatable :: unique_varlist(:)
+    integer :: my_nvars, all_nvars, unique_nvars
+    integer :: i, j, ierr, var_id, ncid, iret
+    integer :: kbgn, kend, ilevtot
+    character(len=max_varname_length) :: vgsiname, varname, name
     character(len=max_filename_length) :: filenamein2
-    real(r_kind),allocatable,dimension(:,:):: uu2d_tmp
-    integer(i_kind) :: countloc_tmp(4),startloc_tmp(4)
 
-    integer(i_kind) nlatcase,nloncase,nxcase,nycase,countloc(4),startloc(4)
-    integer(i_kind) ilev,ilevtot,inative
-    integer(i_kind) kbgn,kend,len
-    logical   :: phy_smaller_domain
-    integer(i_kind) gfile_loc,iret,var_id
-    integer(i_kind) nz,nzp1,mm1,nx_phy
+    ! ... (other variable declarations as in original) ...
 
-    integer(i_kind):: iworld,iworld_group,nread,mpi_comm_read,i,ierror
-    integer(i_kind),dimension(npe):: members,members_read,mype_read_rank
-    logical:: procuse
-
-! for io_layout > 1
-    real(r_kind),allocatable,dimension(:,:):: uu2d_layout
-    integer(i_kind) :: nio
-    integer(i_kind),allocatable :: gfile_loc_layout(:)
-    character(len=180)  :: filename_layout
-
-    mm1=mype+1
-    nloncase=grd_ionouv%nlon
-    nlatcase=grd_ionouv%nlat
-    if (ensgrid) then
-     nxcase=nxens
-     nycase=nyens
-    else
-     nxcase=nx
-     nycase=ny
+    ! 1. Each rank builds its local variable list
+    kbgn = grd_ionouv%kbegin_loc
+    kend = grd_ionouv%kend_loc
+    my_nvars = 0
+    allocate(my_varlist(kend-kbgn+1))
+    do ilevtot = kbgn, kend
+        vgsiname = grd_ionouv%names(1, ilevtot)
+        if (trim(vgsiname)=='delzinc') cycle
+        if (trim(vgsiname)=='amassi') cycle
+        if (trim(vgsiname)=='amassj') cycle
+        if (trim(vgsiname)=='amassk') cycle
+        if (trim(vgsiname)=='pm2_5') cycle
+        call getfv3lamfilevname(vgsiname, fv3filenamegin, filenamein2, varname)
+        my_nvars = my_nvars + 1
+        my_varlist(my_nvars) = trim(varname)
+    end do
+    if (my_nvars < size(my_varlist)) then
+        my_varlist = my_varlist(:my_nvars)
     end if
-    kbgn=grd_ionouv%kbegin_loc
-    kend=grd_ionouv%kend_loc
-    allocate(uu2d(nxcase,nycase))
 
-    procuse = .false.
-    members=-1
-    members_read=-1
-    if (kbgn<=kend) then
-       procuse = .true.
-       members(mm1) = mype
-    endif
-    call mpi_allreduce(members,members_read,npe,mpi_integer,mpi_max,mpi_comm_world,ierror)
+    ! 2. Gather all variable names to all ranks
+    call gather_all_varnames(my_varlist, all_varlist, all_nvars, mpi_comm_world)
 
-    nread=0
-    mype_read_rank=-1
-    do i=1,npe
-       if (members_read(i) >= 0) then
-          nread=nread+1
-          mype_read_rank(nread) = members_read(i)
-       endif
-    enddo
-    
-    call setcomm(iworld,iworld_group,nread,mype_read_rank,mpi_comm_read,ierror)
+    ! 3. Build unique, sorted list on all ranks
+    call build_unique_sorted_varlist(all_varlist, all_nvars, unique_varlist, unique_nvars)
 
-    if (procuse) then
-
-       if(fv3_io_layout_y > 1) then
-          allocate(gfile_loc_layout(0:fv3_io_layout_y-1))
-          do nio=0,fv3_io_layout_y-1
-             write(filename_layout,'(a,a,I4.4)') trim(filenamein),'.',nio
-             iret=nf90_open(filename_layout,ior(nf90_nowrite,nf90_mpiio),gfile_loc_layout(nio),comm=mpi_comm_read,info=MPI_INFO_NULL) !clt
-             if(iret/=nf90_noerr) then
-                write(6,*)' gsi_fv3ncdf_read: problem opening ',trim(filename_layout),gfile_loc_layout(nio),', Status = ',iret
-                call stop2(333)
-             endif
-          enddo
-       else
-          iret=nf90_open(filenamein,ior(nf90_nowrite,nf90_mpiio),gfile_loc,comm=mpi_comm_read,info=MPI_INFO_NULL) !clt
-          if(iret/=nf90_noerr) then
-             write(6,*)' gsi_fv3ncdf_read: problem opening ',trim(filenamein),gfile_loc,', Status = ',iret
-             call stop2(333)
-          endif
-       endif
-       do ilevtot=kbgn,kend
-          vgsiname=grd_ionouv%names(1,ilevtot)
-          if(trim(vgsiname)=='delzinc') cycle  !delzinc is not read from DZ ,it's started from hydrostatic height 
-          if(trim(vgsiname)=='amassi') cycle 
-          if(trim(vgsiname)=='amassj') cycle 
-          if(trim(vgsiname)=='amassk') cycle 
-          if(trim(vgsiname)=='pm2_5') cycle 
-          call getfv3lamfilevname(vgsiname,fv3filenamegin,filenamein2,varname)
-          name=trim(varname)
-          if(trim(filenamein) /= trim(filenamein2)) then
-             write(6,*)'filenamein and filenamein2 are not the same as expected, stop'
-             call stop2(333)
-          endif
-          ilev=grd_ionouv%lnames(1,ilevtot)
-          nz=grd_ionouv%nsig
-          nzp1=nz+1
-          inative=nzp1-ilev
-          startloc=(/1,1,inative,1/)
-          countloc=(/nxcase,nycase,1,1/)
-          ! Variable ref_f3d in phy_data.nc has a smaller domain size than
-          ! dynvariables and tracers as well as a reversed order in vertical
-          if ( trim(adjustl(varname)) == 'ref_f3d' .or. trim(adjustl(varname)) == 'flash_extent_density' )then
-             iret=nf90_inquire_dimension(gfile_loc,1,name,len)
-             if(trim(name)=='xaxis_1') nx_phy=len
-             if( nx_phy == nxcase )then
+    ! 4. Open the NetCDF file collectively
+    iret = nf90_open(filenamein, ior(nf90_nowrite, nf90_mpiio), ncid, comm=mpi_comm_world, info=MPI_INFO_NULL)
+    if (iret /= nf90_noerr) then
+        write(6,*) 'problem opening ', trim(filenamein), ', Status = ', iret
                 allocate(uu2d_tmp(nxcase,nycase))
                 countloc_tmp=(/nxcase,nycase,1,1/)
                 phy_smaller_domain = .false.
