@@ -1602,16 +1602,24 @@ subroutine read_fv3_netcdf_guess(fv3filenamegin)
          end if
 
          if( fv3sar_bg_opt == 0) then 
+            write(6,*)'thinkdeb beofre read grid_fv3lam_uv'
+            call flush(6)
             call gsi_fv3ncdf_readuv(grd_fv3lam_uv,ges_u,ges_v,fv3filenamegin(it),.false.)
+            write(6,*)'thinkdeb after read grid_fv3lam_uv'
+            call flush(6)
          else
            call gsi_fv3ncdf_readuv_v1(grd_fv3lam_uv,ges_u,ges_v,fv3filenamegin(it),.false.)
          endif
 
          if( fv3sar_bg_opt == 0) then 
+            write(6,*)'thinkdeb beofre read dyn grid_fv3lam_nouv'
+            call flush(6)
             call gsi_fv3ncdf_read(grd_fv3lam_dynvar_ionouv,gsibundle_fv3lam_dynvar_nouv &
             & ,fv3filenamegin(it)%dynvars,fv3filenamegin(it),.false.)
+            write(6,*)'thinkdeb after read dyn grid_fv3lam_nouv'
             call gsi_fv3ncdf_read(grd_fv3lam_tracer_ionouv,gsibundle_fv3lam_tracer_nouv &
             & ,fv3filenamegin(it)%tracers,fv3filenamegin(it),.false.)
+            write(6,*)'thinkdeb after read tracer grid_fv3lam_nouv'
             if( nphyvario3d > 0 )then
                call gsi_fv3ncdf_read(grd_fv3lam_phyvar_ionouv,gsibundle_fv3lam_phyvar_nouv &
                & ,fv3filenamegin(it)%phyvars,fv3filenamegin(it),.false.)
@@ -2458,6 +2466,8 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
 !   prgmmr: wu               org: np22                date: 2017-10-10
 !           lei  re-write for parallelization         date: 2021-09-29
 !                 similar for horizontal recurisve filtering
+!           lei  re-write to abiding by the stricter requirements date: 2025-06-24
+!                 of parallel netcdf IO  on top of hdf 5
 ! abstract: read in fields excluding u and v
 ! program history log:
 !
@@ -2479,10 +2489,12 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
 
     use kinds, only: r_kind,i_kind
     use mpimod, only: mpi_comm_world,mpi_rtype,mype,npe,setcomm,mpi_integer,mpi_max
+    use mpimod, only: mpi_character
     use mpimod, only:  MPI_INFO_NULL
     use netcdf, only: nf90_open,nf90_close,nf90_get_var,nf90_noerr
     use netcdf, only: nf90_nowrite,nf90_mpiio,nf90_inquire,nf90_inquire_dimension
     use netcdf, only: nf90_inquire_variable
+    use netcdf, only:nf90_independent,nf90_var_par_access
     use netcdf, only: nf90_inq_varid
     use mod_fv3_lola, only: fv3_h_to_ll,fv3_h_to_ll_ens
     use gsi_bundlemod, only: gsi_bundle
@@ -2495,6 +2507,17 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
     type (type_fv3regfilenameg),intent(in   ) ::fv3filenamegin
     logical,                    intent(in   ) :: ensgrid
 
+    character(len=max_varname_length), allocatable :: all_varnames(:)
+    character(len=max_varname_length), allocatable :: my_varnames(:),my_varnames_tmp(:)
+    integer(i_kind), allocatable :: all_ilevs(:,:)
+    integer(i_kind), allocatable :: my_ilevs(:,:),my_ilevs_tmp(:,:)
+    integer(i_kind):: my_nvars,all_nvars
+    integer(i_kind), allocatable, dimension(:) :: recvcounts, displs
+    integer(i_kind), allocatable, dimension(:) :: recvcounts2, displs2
+    integer(i_kind), allocatable, dimension(:) :: recvcounts_names
+    integer(i_kind), allocatable, dimension(:) :: sendbuf, recvbuf 
+    logical :: l_found
+
     real(r_kind),allocatable,dimension(:,:):: uu2d
     real(r_kind),dimension(1,grd_ionouv%nlat,grd_ionouv%nlon,grd_ionouv%kbegin_loc:grd_ionouv%kend_alloc):: hwork
     character(len=max_varname_length) :: varname,vgsiname
@@ -2504,13 +2527,13 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
     integer(i_kind) :: countloc_tmp(4),startloc_tmp(4)
 
     integer(i_kind) nlatcase,nloncase,nxcase,nycase,countloc(4),startloc(4)
-    integer(i_kind) ilev,ilevtot,inative
+    integer(i_kind) ivar,ilev,ilevtot,inative
     integer(i_kind) kbgn,kend,len
     logical   :: phy_smaller_domain
     integer(i_kind) gfile_loc,iret,var_id
     integer(i_kind) nz,nzp1,mm1,nx_phy
 
-    integer(i_kind):: iworld,iworld_group,nread,mpi_comm_read,i,ierror
+    integer(i_kind):: iworld,iworld_group,nread,mpi_comm_read,npe_read,i,ierror
     integer(i_kind),dimension(npe):: members,members_read,mype_read_rank
     logical:: procuse
 
@@ -2518,7 +2541,10 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
     real(r_kind),allocatable,dimension(:,:):: uu2d_layout
     integer(i_kind) :: nio
     integer(i_kind),allocatable :: gfile_loc_layout(:)
+    integer(i_kind),allocatable :: var_id_layout(:)
     character(len=180)  :: filename_layout
+    integer(i_kind):: iout
+    character*72 :: filenameout
 
     mm1=mype+1
     nloncase=grd_ionouv%nlon
@@ -2555,119 +2581,233 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
     call setcomm(iworld,iworld_group,nread,mype_read_rank,mpi_comm_read,ierror)
 
     if (procuse) then
+        call mpi_comm_size(mpi_comm_read, npe_read, ierror)
+! to collect variables to be read on each rank to build a common list
+! and which will be  used to make each mpi rank in the read communicator to 
+! go through the metadata step as required by the parallel netcdf on top of hdf 5
+ 
+        allocate(my_varnames_tmp(kend-kbgn+1),my_ilevs_tmp(2,kend-kbgn+1))
+        my_nvars = 0
+        do ilevtot = kbgn, kend
+            vgsiname = grd_ionouv%names(1, ilevtot)
+            if (trim(vgsiname)=='delzinc') cycle
+            if (trim(vgsiname)=='amassi') cycle
+            if (trim(vgsiname)=='amassj') cycle
+            if (trim(vgsiname)=='amassk') cycle
+            if (trim(vgsiname)=='pm2_5') cycle
+            call getfv3lamfilevname(vgsiname, fv3filenamegin, filenamein2, varname)
+            my_nvars = my_nvars + 1
+            my_varnames_tmp(my_nvars) = trim(varname)
+            my_ilevs_tmp(1,my_nvars)=grd_ionouv%lnames(1,ilevtot) 
+            my_ilevs_tmp(2,my_nvars)=ilevtot
+        end do
+        allocate(my_varnames(my_nvars),my_ilevs(2,my_nvars))
+        my_varnames = my_varnames_tmp(:my_nvars)
+        my_ilevs = my_ilevs_tmp(:,:my_nvars)
 
-       if(fv3_io_layout_y > 1) then
-          allocate(gfile_loc_layout(0:fv3_io_layout_y-1))
-          do nio=0,fv3_io_layout_y-1
-             write(filename_layout,'(a,a,I4.4)') trim(filenamein),'.',nio
-             iret=nf90_open(filename_layout,ior(nf90_nowrite,nf90_mpiio),gfile_loc_layout(nio),comm=mpi_comm_read,info=MPI_INFO_NULL) !clt
-             if(iret/=nf90_noerr) then
-                write(6,*)' gsi_fv3ncdf_read: problem opening ',trim(filename_layout),gfile_loc_layout(nio),', Status = ',iret
-                call stop2(333)
-             endif
-          enddo
-       else
-          iret=nf90_open(filenamein,ior(nf90_nowrite,nf90_mpiio),gfile_loc,comm=mpi_comm_read,info=MPI_INFO_NULL) !clt
-          if(iret/=nf90_noerr) then
-             write(6,*)' gsi_fv3ncdf_read: problem opening ',trim(filenamein),gfile_loc,', Status = ',iret
-             call stop2(333)
-          endif
-       endif
-       do ilevtot=kbgn,kend
-          vgsiname=grd_ionouv%names(1,ilevtot)
-          if(trim(vgsiname)=='delzinc') cycle  !delzinc is not read from DZ ,it's started from hydrostatic height 
-          if(trim(vgsiname)=='amassi') cycle 
-          if(trim(vgsiname)=='amassj') cycle 
-          if(trim(vgsiname)=='amassk') cycle 
-          if(trim(vgsiname)=='pm2_5') cycle 
-          call getfv3lamfilevname(vgsiname,fv3filenamegin,filenamein2,varname)
-          name=trim(varname)
-          if(trim(filenamein) /= trim(filenamein2)) then
-             write(6,*)'filenamein and filenamein2 are not the same as expected, stop'
-             call stop2(333)
-          endif
-          ilev=grd_ionouv%lnames(1,ilevtot)
-          nz=grd_ionouv%nsig
-          nzp1=nz+1
-          inative=nzp1-ilev
-          startloc=(/1,1,inative,1/)
-          countloc=(/nxcase,nycase,1,1/)
-          ! Variable ref_f3d in phy_data.nc has a smaller domain size than
-          ! dynvariables and tracers as well as a reversed order in vertical
-          if ( trim(adjustl(varname)) == 'ref_f3d' .or. trim(adjustl(varname)) == 'flash_extent_density' )then
-             iret=nf90_inquire_dimension(gfile_loc,1,name,len)
-             if(trim(name)=='xaxis_1') nx_phy=len
-             if( nx_phy == nxcase )then
-                allocate(uu2d_tmp(nxcase,nycase))
-                countloc_tmp=(/nxcase,nycase,1,1/)
-                phy_smaller_domain = .false.
-             else
-                allocate(uu2d_tmp(nxcase-6,nycase-6))
-                countloc_tmp=(/nxcase-6,nycase-6,1,1/)
-                phy_smaller_domain = .true.
-             end if
-             startloc_tmp=(/1,1,ilev,1/)
-          end if
-          
-          if(fv3_io_layout_y > 1) then
-             do nio=0,fv3_io_layout_y-1
-                if (ensgrid) then
-                   countloc=(/nxcase,ny_layout_lenens(nio)+1,1,1/)
-                   allocate(uu2d_layout(nxcase,ny_layout_lenens(nio)+1))
-                else
-                   countloc=(/nxcase,ny_layout_len(nio),1,1/)
-                   allocate(uu2d_layout(nxcase,ny_layout_len(nio)))
-                end if
-                iret=nf90_inq_varid(gfile_loc_layout(nio),trim(adjustl(varname)),var_id)
-                iret=nf90_get_var(gfile_loc_layout(nio),var_id,uu2d_layout,start=startloc,count=countloc)
-                if (ensgrid) then
-                   uu2d(:,ny_layout_bens(nio):ny_layout_eens(nio))=uu2d_layout
-                else
-                   uu2d(:,ny_layout_b(nio):ny_layout_e(nio))=uu2d_layout
-                end if
-                deallocate(uu2d_layout)
-             enddo
-          else
-             iret=nf90_inq_varid(gfile_loc,trim(adjustl(varname)),var_id)
-             if ( trim(adjustl(varname)) == 'ref_f3d'.or. trim(adjustl(varname)) == 'flash_extent_density' )then
-                uu2d = 0.0_r_kind
-                iret=nf90_get_var(gfile_loc,var_id,uu2d_tmp,start=startloc_tmp,count=countloc_tmp)
-                where(uu2d_tmp < 0.0_r_kind)
-                   uu2d_tmp = 0.0_r_kind
-                endwhere
-                
-                if( phy_smaller_domain )then
-                   uu2d(4:nxcase-3,4:nycase-3) = uu2d_tmp
-                else
-                   uu2d(1:nxcase,1:nycase) = uu2d_tmp
-                end if
-                deallocate(uu2d_tmp)
-             else
-                iret=nf90_get_var(gfile_loc,var_id,uu2d,start=startloc,count=countloc)
-             end if
-          endif
-          
-          if (ensgrid) then
-             call fv3_h_to_ll_ens(uu2d,hwork(1,:,:,ilevtot),nxcase,nycase,nloncase,nlatcase,grid_reverse_flag)
-          else
-             call fv3_h_to_ll(uu2d,hwork(1,:,:,ilevtot),nxcase,nycase,nloncase,nlatcase,grid_reverse_flag)
-          endif
-       enddo  ! ilevtot
+    ! 2. Gather all (varname,level) pairs to all ranks
+        allocate(recvcounts(npe_read), displs(npe_read))
+        allocate(recvcounts_names(npe_read))
+        call mpi_allgather(my_nvars, 1, mpi_integer, recvcounts, 1, mpi_integer, mpi_comm_read, ierror)
+        all_nvars = sum(recvcounts)
+
+        allocate(sendbuf(2*my_nvars))
+        sendbuf = reshape(my_ilevs,[2*my_nvars]) 
+
+        allocate(recvbuf(2*all_nvars))
+        allocate(recvcounts2(npe_read), displs2(npe_read))
+        call mpi_allgather(my_nvars, 1, mpi_integer, recvcounts, 1, mpi_integer, mpi_comm_read, ierror)
+        all_nvars = sum(recvcounts)
+        displs(1) = 0
+        recvcounts_names=recvcounts*max_varname_length
+        do i = 2, npe_read
+           displs(i) = displs(i-1) + recvcounts_names(i-1)
+        end do
+        allocate(all_varnames(all_nvars), all_ilevs(2,all_nvars))
+        call mpi_allgatherv(my_varnames, my_nvars*max_varname_length, mpi_character, all_varnames, recvcounts_names, displs, &
+                             mpi_character, mpi_comm_read,ierror)
+
+
+        do i = 1, npe_read
+          recvcounts2(i) = 2*recvcounts(i)
+        end do
+        do i = 2, npe_read
+          displs2(i) = displs2(i-1) + recvcounts2(i-1)
+        enddo
+         call mpi_allgatherv(sendbuf, 2*my_nvars, mpi_integer, recvbuf, recvcounts2, displs2, mpi_integer, mpi_comm_read, ierror)
+     ! Unpack
+        all_ilevs = reshape(recvbuf,[2,all_nvars])
+
        
-       if(fv3_io_layout_y > 1) then
-          do nio=1,fv3_io_layout_y-1
-             iret=nf90_close(gfile_loc_layout(nio))
-          enddo
-          deallocate(gfile_loc_layout)
-       else
-          iret=nf90_close(gfile_loc)
-       endif
+        if(fv3_io_layout_y > 1) then
+           allocate(gfile_loc_layout(0:fv3_io_layout_y-1))
+           allocate(var_id_layout(0:fv3_io_layout_y-1))
+           do nio=0,fv3_io_layout_y-1
+              write(filename_layout,'(a,a,I4.4)') trim(filenamein),'.',nio
+              iret=nf90_open(filename_layout,ior(nf90_nowrite,nf90_mpiio),gfile_loc_layout(nio),comm=mpi_comm_read,info=MPI_INFO_NULL) !clt
+              if(iret/=nf90_noerr) then
+                    write(6,*)' gsi_fv3ncdf_read: problem opening ',trim(filename_layout),gfile_loc_layout(nio),', Status = ',iret
+                    call stop2(333)
+              endif
+           enddo
+        else
+           iret=nf90_open(filenamein,ior(nf90_nowrite,nf90_mpiio),gfile_loc,comm=mpi_comm_read,info=MPI_INFO_NULL) !clt
+           write(6,*)"thinkdebfilenamein is ",trim(filenamein)
+           if(iret/=nf90_noerr) then
+              write(6,*)' gsi_fv3ncdf_read: problem opening ',trim(filenamein),gfile_loc,', Status = ',iret
+              call stop2(333)
+           endif
+        endif
+        do ilevtot=kbgn,kend
+           vgsiname=grd_ionouv%names(1,ilevtot)
+           call getfv3lamfilevname(vgsiname,fv3filenamegin,filenamein2,varname)
+        enddo 
+        nz=grd_ionouv%nsig
+        nzp1=nz+1
+        write(6,*)'thinkdeb all_nvars is ',all_nvars
+        call flush(6)
+         write(filenameout, '(A,I4.4,A)') trim(filenamein)//'output_rank_', mype, '.txt'
+        iout=mype+20
+        open(unit=iout,file=trim(filenameout) ,form="formatted", status="new")
+
+        do ivar=1, all_nvars   !all_nvars include the vertical levels for the same variable
+           varname=all_varnames(ivar)
+           ilev=all_ilevs(1,ivar) 
+           ilevtot=all_ilevs(2,ivar) 
+           write(iout,*)ilev,ilevtot,trim(varname)
+           if(fv3_io_layout_y > 1) then
+              do nio=0,fv3_io_layout_y-1
+                 iret=nf90_inq_varid(gfile_loc_layout(nio),trim(adjustl(varname)),var_id_layout(nio))
+                 call check( nf90_var_par_access(gfile_loc_layout(nio),var_id_layout(nio), nf90_independent))
+              enddo
+           else
+              write(6,*)'thinkdeb ivar is0 ',ivar,' ',trim(varname),' ',ilev,' ',ilevtot
+              call check(nf90_inq_varid(gfile_loc,trim(adjustl(varname)),var_id))
+              call check( nf90_var_par_access(gfile_loc,var_id, nf90_independent))
+           endif
+               write(6,*)'thinkdeb ivar is1 ',ivar,' ',trim(varname),' ',ilev,' ',ilevtot
+           call flush(6)
+           l_found = .false.
+           do i = 1, size(my_varnames)
+             if (trim(adjustl(my_varnames(i))) == trim(adjustl(varname)).and. my_ilevs(1,i) == ilev) then
+                l_found = .true.
+                exit
+             end if
+           end do
+               if ( trim(adjustl(varname)) == 'ref_f3d' .or. trim(adjustl(varname)) == 'flash_extent_density' )then
+                  iret=nf90_inquire_dimension(gfile_loc,1,name,len)
+                  if(trim(name)=='xaxis_1') nx_phy=len
+                  if( nx_phy == nxcase )then
+                     allocate(uu2d_tmp(nxcase,nycase))
+                     countloc_tmp=(/nxcase,nycase,1,1/)
+                     phy_smaller_domain = .false.
+                  else
+                     allocate(uu2d_tmp(nxcase-6,nycase-6))
+                     countloc_tmp=(/nxcase-6,nycase-6,1,1/)
+                     phy_smaller_domain = .true.
+                  end if
+                  startloc_tmp=(/1,1,ilev,1/)
+               end if
+
+           if (l_found ) then
+           write(6,*)'thinkdeb ivar is l_found 1 ',ivar,' ',trim(varname),' ',ilev,' ',ilevtot
+           call flush(6)
+               inative=nzp1-ilev
+               startloc=(/1,1,inative,1/)
+               countloc=(/nxcase,nycase,1,1/)
+               ! Variable ref_f3d in phy_data.nc has a smaller domain size than
+               ! dynvariables and tracers as well as a reversed order in vertical
+   if( 1.gt. 2) then 
+               if ( trim(adjustl(varname)) == 'ref_f3d' .or. trim(adjustl(varname)) == 'flash_extent_density' )then
+                  iret=nf90_inquire_dimension(gfile_loc,1,name,len)
+                  if(trim(name)=='xaxis_1') nx_phy=len
+                  if( nx_phy == nxcase )then
+                     allocate(uu2d_tmp(nxcase,nycase))
+                     countloc_tmp=(/nxcase,nycase,1,1/)
+                     phy_smaller_domain = .false.
+                  else
+                     allocate(uu2d_tmp(nxcase-6,nycase-6))
+                     countloc_tmp=(/nxcase-6,nycase-6,1,1/)
+                     phy_smaller_domain = .true.
+                  end if
+                  startloc_tmp=(/1,1,ilev,1/)
+               end if
     endif
-    call mpi_barrier(mpi_comm_world,ierror)
-       
+               
+               if(fv3_io_layout_y > 1) then
+                  do nio=0,fv3_io_layout_y-1
+                     if (ensgrid) then
+                        countloc=(/nxcase,ny_layout_lenens(nio)+1,1,1/)
+                        allocate(uu2d_layout(nxcase,ny_layout_lenens(nio)+1))
+                     else
+                        countloc=(/nxcase,ny_layout_len(nio),1,1/)
+                        allocate(uu2d_layout(nxcase,ny_layout_len(nio)))
+                     end if
+                     iret=nf90_get_var(gfile_loc_layout(nio),var_id_layout(nio),uu2d_layout,start=startloc,count=countloc)
+                     if (ensgrid) then
+                        uu2d(:,ny_layout_bens(nio):ny_layout_eens(nio))=uu2d_layout
+                     else
+                        uu2d(:,ny_layout_b(nio):ny_layout_e(nio))=uu2d_layout
+                     end if
+                     deallocate(uu2d_layout)
+                  enddo
+               else
+                  if ( trim(adjustl(varname)) == 'ref_f3d'.or. trim(adjustl(varname)) == 'flash_extent_density' )then
+                     uu2d = 0.0_r_kind
+                    write(6,*)'thinkdeb mype22 ref3 begin is ',mype,' ',trim(adjustl(varname))
+                    call flush(6)
+                     iret=nf90_get_var(gfile_loc,var_id,uu2d_tmp,start=startloc_tmp,count=countloc_tmp)
+                    write(6,*)'thinkdeb mype22 ref3 is ',mype,' ',trim(adjustl(varname))
+                    call flush(6)
+                     where(uu2d_tmp < 0.0_r_kind)
+                        uu2d_tmp = 0.0_r_kind
+                     endwhere
+                     if( phy_smaller_domain )then
+                        uu2d(4:nxcase-3,4:nycase-3) = uu2d_tmp
+                     else
+                        uu2d(1:nxcase,1:nycase) = uu2d_tmp
+                     end if
+                     deallocate(uu2d_tmp)
+                  else
+                     iret=nf90_get_var(gfile_loc,var_id,uu2d,start=startloc,count=countloc)
+                  end if
+               endif
+               
+           write(6,*)'thinkdeb ivar is 3 ',ivar,' ',trim(varname),' ',ilev,' ',ilevtot,' ',l_found
+           call flush(6)
+               if (ensgrid) then
+                  call fv3_h_to_ll_ens(uu2d,hwork(1,:,:,ilevtot),nxcase,nycase,nloncase,nlatcase,grid_reverse_flag)
+               else
+                  write(6,*)'thinkdeb 22',ilevtot,' ',grd_ionouv%kbegin_loc,' ',grd_ionouv%kend_alloc
+                  write(6,*)'thinkdeb 220 my_ilevs ',my_ilevs(1,:)
+                  write(6,*)'thinkdeb 220.5 my_ilevs 2 ',my_ilevs(2,:)
+                  write(6,*)'thinkdeb 221 ',ilevtot,' ',ilev
+                  call flush(6)
+                  call fv3_h_to_ll(uu2d,hwork(1,:,:,ilevtot),nxcase,nycase,nloncase,nlatcase,grid_reverse_flag)
+               endif
+               write(6,*)'thinkdeb mype24 is ',mype
+              endif ! if actual read would be done 
+           enddo  ! over all_var 
+           
+           if(fv3_io_layout_y > 1) then
+              do nio=1,fv3_io_layout_y-1
+                 iret=nf90_close(gfile_loc_layout(nio))
+              enddo
+              deallocate(gfile_loc_layout,var_id_layout)
+           else
+              iret=nf90_close(gfile_loc)
+           endif
+           deallocate( recvcounts, displs)
+           deallocate( recvcounts_names)
+           deallocate( recvcounts2, displs2)
+           deallocate( sendbuf, recvbuf)
+           deallocate(all_varnames, all_ilevs)
+           deallocate(my_varnames, my_varnames_tmp,my_ilevs)
+        endif
     deallocate (uu2d)
+    call mpi_barrier(mpi_comm_world,ierror)
     call general_grid2sub(grd_ionouv,hwork,cstate_nouv%values)
-    
+    close (iout) 
     return
   end subroutine gsi_fv3ncdf_read
 
