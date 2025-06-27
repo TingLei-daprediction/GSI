@@ -2678,12 +2678,28 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
            if(fv3_io_layout_y > 1) then
               do nio=0,fv3_io_layout_y-1
                  iret=nf90_inq_varid(gfile_loc_layout(nio),trim(adjustl(varname)),var_id_layout(nio))
-                 call check( nf90_var_par_access(gfile_loc_layout(nio),var_id_layout(nio), nf90_independent))
+                 if (iret /= 0) then
+                    write(6,*) 'ERROR: RANK', mype, 'nf90_inq_varid failed for', trim(varname), 'ivar', ivar, 'nio', nio, 'iret', iret
+                    call stop2(333)
+                 endif
+                 iret = nf90_var_par_access(gfile_loc_layout(nio), var_id_layout(nio), nf90_independent)
+                 if (iret /= 0) then
+                    write(6,*) 'ERROR: RANK', mype, 'nf90_var_par_access failed for', trim(varname), 'ivar', ivar, 'nio', nio, 'iret', iret
+                    call stop2(333)
+                 endif
               enddo
            else
               write(6,*)'thinkdeb ivar is0 ',ivar,' ',trim(varname),' ',ilev,' ',ilevtot
-              call check(nf90_inq_varid(gfile_loc,trim(adjustl(varname)),var_id))
-              call check( nf90_var_par_access(gfile_loc,var_id, nf90_independent))
+              iret=nf90_inq_varid(gfile_loc,trim(adjustl(varname)),var_id)
+              if (iret /= 0) then
+                 write(6,*) 'ERROR: RANK', mype, 'nf90_inq_varid failed for', trim(varname), 'ivar', ivar, 'iret', iret
+                 call stop2(333)
+              endif
+              iret = nf90_var_par_access(gfile_loc, var_id, nf90_independent)
+              if (iret /= 0) then
+                 write(6,*) 'ERROR: RANK', mype, 'nf90_var_par_access failed for', trim(varname), 'ivar', ivar, 'iret', iret
+                 call stop2(333)
+              endif
            endif
                write(6,*)'thinkdeb ivar is1 ',ivar,' ',trim(varname),' ',ilev,' ',ilevtot
            call flush(6)
@@ -2696,6 +2712,10 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
            end do
                if ( trim(adjustl(varname)) == 'ref_f3d' .or. trim(adjustl(varname)) == 'flash_extent_density' )then
                   iret=nf90_inquire_dimension(gfile_loc,1,name,len)
+                  if (iret /= 0) then
+                     write(6,*) 'ERROR: RANK', mype, 'nf90_inquire_dimension failed for', trim(varname), 'ivar', ivar, 'iret', iret
+                     call stop2(333)
+                  endif
                   if(trim(name)=='xaxis_1') nx_phy=len
                   if( nx_phy == nxcase )then
                      allocate(uu2d_tmp(nxcase,nycase))
@@ -2744,6 +2764,10 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
                         allocate(uu2d_layout(nxcase,ny_layout_len(nio)))
                      end if
                      iret=nf90_get_var(gfile_loc_layout(nio),var_id_layout(nio),uu2d_layout,start=startloc,count=countloc)
+                     if (iret /= 0) then
+                        write(6,*) 'ERROR: RANK', mype, 'nf90_get_var failed for', trim(varname), 'ivar', ivar, 'nio', nio, 'iret', iret
+                        call stop2(333)
+                     endif
                      if (ensgrid) then
                         uu2d(:,ny_layout_bens(nio):ny_layout_eens(nio))=uu2d_layout
                      else
@@ -2757,6 +2781,10 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
                     write(6,*)'thinkdeb mype22 ref3 begin is ',mype,' ',trim(adjustl(varname))
                     call flush(6)
                      iret=nf90_get_var(gfile_loc,var_id,uu2d_tmp,start=startloc_tmp,count=countloc_tmp)
+                     if (iret /= 0) then
+                        write(6,*) 'ERROR: RANK', mype, 'nf90_get_var failed for', trim(varname), 'ivar', ivar, 'iret', iret
+                        call stop2(333)
+                     endif
                     write(6,*)'thinkdeb mype22 ref3 is ',mype,' ',trim(adjustl(varname))
                     call flush(6)
                      where(uu2d_tmp < 0.0_r_kind)
@@ -2769,7 +2797,11 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
                      end if
                      deallocate(uu2d_tmp)
                   else
-                     iret=nf90_get_var(gfile_loc,var_id,uu2d,start=startloc,count=countloc)
+                      iret=nf90_get_var(gfile_loc,var_id,uu2d,start=startloc,count=countloc)
+                      if (iret /= 0) then
+                         write(6,*) 'ERROR: RANK', mype, 'nf90_get_var failed for', trim(varname), 'ivar', ivar, 'iret', iret
+                         call stop2(333)
+                      endif
                   end if
                endif
                
