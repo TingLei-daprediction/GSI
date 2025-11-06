@@ -62,6 +62,7 @@ module gsi_rfv3io_mod
   use chemmod, only: naero_cmaq_fv3,aeronames_cmaq_fv3,imodes_cmaq_fv3,laeroana_fv3cmaq
   use chemmod, only: naero_smoke_fv3,aeronames_smoke_fv3,laeroana_fv3smoke  
   use rapidrefresh_cldsurf_mod, only: i_howv_3dda
+  use mpi 
 
   implicit none
   public type_fv3regfilenameg
@@ -2478,6 +2479,8 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
     integer(i_kind):: iworld,iworld_group,nread,mpi_comm_read,i,ierror
     integer(i_kind),dimension(npe):: members,members_read,mype_read_rank
     logical:: procuse
+  real(kind=8) :: time_beg,time_end,walltime
+  integer(i_kind) :: ierr
 
 ! for io_layout > 1
     real(r_kind),allocatable,dimension(:,:):: uu2d_layout
@@ -2520,6 +2523,7 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
     call setcomm(iworld,iworld_group,nread,mype_read_rank,mpi_comm_read,ierror)
 
     if (procuse) then
+    time_beg=MPI_Wtime()
 
        if(fv3_io_layout_y > 1) then
           allocate(gfile_loc_layout(0:fv3_io_layout_y-1))
@@ -2627,11 +2631,20 @@ subroutine gsi_fv3ncdf_read(grd_ionouv,cstate_nouv,filenamein,fv3filenamegin,ens
        else
           iret=nf90_close(gfile_loc)
        endif
+    time_end=MPI_Wtime()
+    call MPI_Reduce(time_end-time_beg, walltime, 1, MPI_REAL8, MPI_MAX, 0, mpi_comm_read, ierr)
+    if(ierr /= MPI_SUCCESS) print*,'MPI_Reduce ',ierr
+    if(mype==0) write(6,'("Maximum Walltime for read step in read_netcdf " f15.4)') walltime
     endif
     call mpi_barrier(mpi_comm_world,ierror)
        
     deallocate (uu2d)
+    time_beg=MPI_Wtime()
     call general_grid2sub(grd_ionouv,hwork,cstate_nouv%values)
+    time_end=MPI_Wtime()
+    call MPI_Reduce(time_end-time_beg, walltime, 1, MPI_REAL8, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
+    if(ierr /= MPI_SUCCESS) print*,'MPI_Reduce ',ierr
+    if(mype==0) write(6,'("Maximum Walltime for grid2sub in read_netcdf " f15.4)') walltime
     
     return
   end subroutine gsi_fv3ncdf_read

@@ -867,7 +867,13 @@ subroutine multb(vec1,vec2)
      if(anisotropic) then
         call anbkerror(vec2)
      else
+           time_beg=MPI_Wtime()  !now use the existing variable
         call bkerror(vec2)
+           time_end=MPI_Wtime()  !now use the existing variable
+          call MPI_Reduce(time_end-time_beg, walltime, 1, MPI_REAL8, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
+           if (mype == 0) then
+             print '(A,F10.6,A)', 'thinkdeb999Blockstatic B time (max over ranks)',walltime
+           end if
      end if
 
 !    If hybrid ensemble run, then multiply ensemble control variable a_en 
@@ -878,7 +884,13 @@ subroutine multb(vec1,vec2)
            write(6,*)' ANBKERROR_A_EN not written yet, program stops'
            stop
         else
+           time_beg=MPI_Wtime()  !now use the existing variable
            call bkerror_a_en(vec2)
+           time_end=MPI_Wtime()  !now use the existing variable
+          call MPI_Reduce(time_end-time_beg, walltime, 1, MPI_REAL8, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
+           if (mype == 0) then
+             print '(A,F10.6,A)', 'thinkdeb999Block time (max over ranks)',walltime
+           end if
         end if
 
      end if

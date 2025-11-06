@@ -162,6 +162,7 @@ subroutine glbsoi
   use m_obsdiags, only: obsdiags_write
   use gsi_io,only: verbose
   use m_berror_stats,only: inquire_berror
+  use mpi
 
   implicit none
 
@@ -174,6 +175,8 @@ subroutine glbsoi
   real(r_kind) :: zgg,zxy
   character(len=12) :: clfile
   logical print_verbose
+  real(kind=8) :: time_beg,time_end,walltime
+  integer(i_kind) :: ierr
 
   print_verbose=.false.
   if(verbose)print_verbose=.true.
@@ -278,7 +281,13 @@ subroutine glbsoi
 
 ! If l_hyb_ens is true, then read in ensemble perturbations
   if(l_hyb_ens) then
+     
+    time_beg=MPI_Wtime()
      call load_ensemble
+    time_end=MPI_Wtime()
+    call MPI_Reduce(time_end-time_beg, walltime, 1, MPI_REAL8, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
+    if(ierr /= MPI_SUCCESS) print*,'MPI_Reduce ',ierr
+    if(mype==0) write(6,'("Maximum Walltime for load_ensemble" f15.4)') walltime
      call hybens_localization_setup
   end if
 
