@@ -42,6 +42,7 @@ subroutine write_all(increment)
   use mpeu_util, only: die
 
   use control_vectors, only: control_vector
+  use mpi, only : MPI_Wtime, MPI_Comm_World, MPI_REAL8, MPI_MAX, MPI_SUCCESS
 
   implicit none
 
@@ -113,6 +114,8 @@ subroutine write_all(increment)
   integer(i_kind) mype_atm,mype_bias,mype_sfc,iret_bias,ier
   real(r_kind),dimension(:,:),pointer::ges_z=>NULL()
   type(regional_io_class) :: io 
+  real(kind=8) :: time_beg,time_end,walltime
+  integer(i_kind) :: ierr
 
 #ifndef HAVE_ESMF
 !********************************************************************
@@ -121,7 +124,13 @@ subroutine write_all(increment)
 ! Regional output
   if (regional) then
      if (fv3_regional) then
+           time_beg=MPI_Wtime()  !now use the existing variable
         call wrfv3_netcdf(bg_fv3regfilenameg(ntguessig))
+           time_end=MPI_Wtime()  !now use the existing variable
+          call MPI_Reduce(time_end-time_beg, walltime, 1, MPI_REAL8, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
+           if (mype == 0) then
+             print '(A,F10.6,A)', 'wrfv3_netcdf  time (max over ranks)',walltime
+           end if
      else
         call io%write_regional_analysis(mype)
      endif
